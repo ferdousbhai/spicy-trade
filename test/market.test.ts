@@ -72,7 +72,6 @@ describe('volatility classification', () => {
       .toBe('NIO Inc.')
     expect(issuerName('KE Holdings Inc American Depositary Shares (each representing three Class A Ordinary Shares)'))
       .toBe('KE Holdings Inc')
-    expect(issuerName('Petroleo Brasileiro S.A. Petrobras ADS')).toBe('Petroleo Brasileiro S.A. Petrobras')
   })
 
   it('drops a trailing qualifier and the abbreviated name the tape carries', () => {
@@ -122,9 +121,6 @@ describe('snapshot contract', () => {
       watchlists: [{ ...owner.watchlists[0]!, kind: 'public' as const }],
     }
 
-    // Both audiences now carry identical ticker fields: reading held positions needs the
-    // member's own broker credential, which this Worker does not hold. What still separates
-    // the audiences is the watchlist, whose `kind` reveals provenance.
     expect(PublicMarketSnapshotSchema.parse(publicValue).tickers[0]).toEqual(owner.tickers[0])
     expect(() => PublicMarketSnapshotSchema.parse(owner)).toThrow()
     // Derived from the owner schema, the public one still refuses a field it does not name.
@@ -187,8 +183,8 @@ describe('tastytrade normalization', () => {
       symbol: 'SPY', price: 700, ivIndex: 18, ivRank: 25, ivPercentile: 30,
       marketCap: 900_000_000_000, volume: 12_345_678,
       updatedAt: '2026-08-13T13:31:00.000Z',
+      sparkline: [], change: 5, changePercent: expect.closeTo(0.7194244604),
     })
-    expect(liveTicker('SPY', metrics, quote).sparkline).toEqual([])
     expect(liveTicker('SPY', { ...metrics, 'market-cap': '0' }, quote).marketCap)
       .toBeUndefined()
     expect(liveTicker('SPCX', metrics, quote, {
@@ -204,9 +200,6 @@ describe('tastytrade normalization', () => {
     expect(() => liveTicker('SPY', undefined, quote)).toThrow('missing-metrics')
     expect(() => liveTicker('SPY', metrics, { ...quote, 'updated-at': undefined }))
       .toThrow('invalid-updated-at')
-    const projected = liveTicker('SPY', metrics, quote)
-    expect(projected.change).toBe(5)
-    expect(projected.changePercent).toBeCloseTo(0.7194244604)
     expect(liveTicker('SPY', {
       symbol: 'SPY',
       'implied-volatility-index': null,

@@ -27,7 +27,7 @@ const BriefScreen = lazy(async () => {
 })
 
 /** Where the application itself lives: `/` redirects here, and a symbol chosen anywhere lands here. */
-export const WATCH_PATH = '/watch'
+const WATCH_PATH = '/watch'
 
 type MarketScreenProps = ComponentProps<typeof MarketScreen>
 /**
@@ -65,40 +65,21 @@ function useWorkspace(): Workspace {
 
 export function SpiceApp() {
   const auth = useViewer()
+  const viewer: Viewer | null = auth.phase === 'ready' ? auth.user : null
+  const owner = viewer?.role === 'owner'
   // The audience stays unknown until the session check answers. Booting the public surface on
   // a guess discarded the owner's stored snapshot on every refresh — the record belongs to one
   // audience, and restoring for the other throws it away — so a page that already had the
   // market on disk went blank and fetched it again, twice.
-  return (
-    <SpiceWorkspace
-      audience={auth.phase === 'ready' ? (auth.user?.role === 'owner' ? 'owner' : 'public') : undefined}
-      authError={auth.phase === 'error' ? auth.message : undefined}
-      viewer={auth.phase === 'ready' ? auth.user : null}
-    />
-  )
-}
-
-function SpiceWorkspace({
-  audience,
-  authError,
-  viewer,
-}: {
-  audience?: SnapshotAudience
-  authError?: string
-  viewer: Viewer | null
-}) {
+  const audience: SnapshotAudience | undefined = auth.phase === 'ready' ? (owner ? 'owner' : 'public') : undefined
+  const authError = auth.phase === 'error' ? auth.message : undefined
   const router = useRouter()
   const matchRoute = useMatchRoute()
-  const owner = viewer?.role === 'owner'
-  const viewerId = viewer?.id
   const market = useAudienceMarket(audience)
   const { chooseSymbol: saveSelectedSymbol, preference, snapshot, tickers } = market
-  const favorites = useWorkspaceFavorites(viewerId, preference)
+  const favorites = useWorkspaceFavorites(viewer?.id, preference)
   const snapshotReady = Boolean(snapshot)
-  const catalysts = snapshot?.catalysts ?? []
-  const watchlists = snapshot?.watchlists ?? []
-  const brief = snapshot?.brief
-  const activeWatchlist = watchlists[0]
+  const activeWatchlist = snapshot?.watchlists[0]
   const fallbackSymbol = mostActiveSymbol(tickers, activeWatchlist?.symbols)
   const selected = tickers.find((ticker) => ticker.symbol === preference?.selectedSymbol)
     ?? tickers.find((ticker) => ticker.symbol === fallbackSymbol)
@@ -126,7 +107,7 @@ function SpiceWorkspace({
   // hand is what the reader is actually looking at.
   const lastUpdatedAt = [snapshot?.syncedAt, ...tickers.map((ticker) => ticker.updatedAt)]
     .filter((at): at is string => Boolean(at))
-    .reduce<string | undefined>((newest, at) => (newest === undefined || at > newest ? at : newest), undefined)
+    .sort().at(-1)
 
   // Stable row callbacks keep the memoized market rows from re-rendering on every
   // workspace render. The selection itself stays in the market preference, not the URL; this
@@ -141,8 +122,8 @@ function SpiceWorkspace({
     activeWatchlist,
     authError,
     bootstrapComplete: market.bootstrapComplete,
-    brief,
-    catalysts,
+    brief: snapshot?.brief,
+    catalysts: snapshot?.catalysts ?? [],
     chooseSymbol,
     favorites,
     owner,
@@ -168,7 +149,7 @@ function SpiceWorkspace({
           viewerImage={viewer?.image}
           viewerName={viewer?.name}
         />
-        <div className="flex-1 text-sm outline-none">
+        <div className="text-sm">
           <main id="main-content" className="main-content">
             {visibleSnapshotWarning && (
               <Alert>
@@ -181,7 +162,7 @@ function SpiceWorkspace({
             </WorkspaceContext.Provider>
           </main>
         </div>
-        <nav aria-label="Primary navigation" className="bottom-nav inline-flex items-center justify-center text-muted-foreground">
+        <nav aria-label="Primary navigation" className="bottom-nav items-center text-muted-foreground">
           <PrimaryLink icon={<Gauge />} label="Watch" to="/watch" />
           <PrimaryLink icon={<Newspaper />} label="Recommendations" to="/recommendations" />
           <PrimaryLink icon={<Plug />} label="Connect" to="/connect" />
@@ -195,7 +176,7 @@ function SpiceWorkspace({
 function PrimaryLink({ icon, label, to }: { icon: ReactNode; label: string; to: '/watch' | '/recommendations' | '/connect' }) {
   return (
     <Link
-      className="primary-link relative inline-flex flex-1 rounded-md items-center justify-center whitespace-nowrap transition-all focus-visible:outline-1 focus-visible:outline-ring [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
+      className="primary-link inline-flex flex-1 rounded-md items-center justify-center whitespace-nowrap transition-all focus-visible:outline-1 focus-visible:outline-ring [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
       to={to}
     >
       {icon}

@@ -21,14 +21,13 @@ function stubPhoneViewport(): void {
 }
 
 function renderMarket(onSelectTicker: (symbol: string) => void = () => undefined): void {
+  stubPhoneViewport()
+  vi.stubGlobal('fetch', vi.fn(async () => Response.json({ catalysts: [], ran: false })))
   renderMarketScreen({ symbol: 'NVDA', onSelectTicker })
 }
 
 describe('the phone list', () => {
   it('replaces the table below the breakpoint and keeps the price in every row', () => {
-    stubPhoneViewport()
-    vi.stubGlobal('fetch', vi.fn(async () => Response.json({ catalysts: [], ran: false })))
-
     renderMarket()
 
     expect(document.querySelector('.premium-data-table')).toBeNull()
@@ -43,9 +42,6 @@ describe('the phone list', () => {
   })
 
   it('cycles every pill together through the readings the table has columns for', () => {
-    stubPhoneViewport()
-    vi.stubGlobal('fetch', vi.fn(async () => Response.json({ catalysts: [], ran: false })))
-
     renderMarket()
 
     const pill = (symbol: string) => [...document.querySelectorAll('.watch-row')]
@@ -64,9 +60,6 @@ describe('the phone list', () => {
   })
 
   it('sorts from one control and reads the direction back', () => {
-    stubPhoneViewport()
-    vi.stubGlobal('fetch', vi.fn(async () => Response.json({ catalysts: [], ran: false })))
-
     renderMarket()
 
     const symbols = () => [...document.querySelectorAll('.watch-row .ticker-table-button strong')]
@@ -80,8 +73,6 @@ describe('the phone list', () => {
   })
 
   it('keeps the selected name in a strip and opens the card as a sheet on a tap', () => {
-    stubPhoneViewport()
-    vi.stubGlobal('fetch', vi.fn(async () => Response.json({ catalysts: [], ran: false })))
     const selected: string[] = []
 
     renderMarket((symbol) => selected.push(symbol))
@@ -113,10 +104,7 @@ describe('the phone row chart', () => {
 
     renderMarketScreen({ tickers: snapshot.tickers })
 
-    await waitFor(() => {
-      expect(document.querySelector('.watch-row .year-sparkline')).not.toBeNull()
-    })
-    expect(document.querySelectorAll('.watch-row .year-sparkline')).toHaveLength(1)
+    await waitFor(() => { expect(document.querySelectorAll('.watch-row .year-sparkline')).toHaveLength(1) })
     expect(document.querySelector('.watch-row .session-sparkline')).toBeNull()
   })
 })

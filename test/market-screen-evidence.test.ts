@@ -25,7 +25,7 @@ function card(overrides: Partial<SymbolEvidence> = {}): SymbolEvidence {
   }
 }
 
-/** Answers both requests the focus card makes: the catalyst search, and the evidence read. */
+/** Answers every request the focus card makes: the evidence read, and the catalyst read and search. */
 function stubFetch(evidence: readonly SymbolEvidence[]): void {
   vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => (
     String(input).startsWith('/api/public-symbol-evidence')
@@ -34,15 +34,11 @@ function stubFetch(evidence: readonly SymbolEvidence[]): void {
   )))
 }
 
-function renderMarket(symbol: string): void {
-  renderMarketScreen({ symbol })
-}
-
 describe('evidence recorded under the selected symbol', () => {
   it('shows the quote, the recorder\'s reading of it, and the page it came from', async () => {
     stubFetch([card()])
 
-    renderMarket('NVDA')
+    renderMarketScreen({ symbol: 'NVDA' })
 
     expect(await screen.findByText('signed a multi-year supply agreement')).toBeTruthy()
     expect(screen.getByText('Visibility into next year, not this quarter.')).toBeTruthy()
@@ -60,7 +56,7 @@ describe('evidence recorded under the selected symbol', () => {
   it('says nothing at all when nothing has been recorded', async () => {
     stubFetch([])
 
-    renderMarket('NVDA')
+    renderMarketScreen({ symbol: 'NVDA' })
 
     await waitFor(() => expect(document.querySelector('.focus-runway')).not.toBeNull())
     expect(document.querySelector('.focus-evidence')).toBeNull()
@@ -73,7 +69,7 @@ describe('evidence recorded under the selected symbol', () => {
         : Response.json({ catalysts: [], ran: false })
     )))
 
-    renderMarket('NVDA')
+    renderMarketScreen({ symbol: 'NVDA' })
 
     expect(await screen.findByText('Evidence unavailable')).toBeTruthy()
     expect(document.querySelector('.evidence-cards')).toBeNull()
@@ -91,7 +87,7 @@ describe('evidence recorded under the selected symbol', () => {
     // 02:30 UTC on the 2nd is still the evening of the 1st in New York.
     stubFetch([card({ recordedAt: '2026-09-02T02:30:00.000Z' })])
 
-    renderMarket('NVDA')
+    renderMarketScreen({ symbol: 'NVDA' })
 
     const recorded = await screen.findByText('Sep 1, 2026')
     expect(recorded.getAttribute('datetime')).toBe('2026-09-02T02:30:00.000Z')

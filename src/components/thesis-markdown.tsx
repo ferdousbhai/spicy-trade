@@ -22,7 +22,7 @@ export function ThesisMarkdown({ text }: { text: string }) {
   return (
     <div className="thesis">
       {parseThesisMarkdown(text).map((block, index) => {
-        if (block.kind === 'heading') return <p className="thesis-heading" key={index}><strong><Inlines inlines={block.inlines} /></strong></p>
+        if (block.kind === 'heading') return <p key={index}><strong><Inlines inlines={block.inlines} /></strong></p>
         if (block.kind === 'paragraph') return <p key={index}><Inlines inlines={block.inlines} /></p>
         const items = block.items.map((item, itemIndex) => <li key={itemIndex}><Inlines inlines={item} /></li>)
         return block.ordered ? <ol key={index}>{items}</ol> : <ul key={index}>{items}</ul>

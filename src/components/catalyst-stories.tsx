@@ -3,7 +3,6 @@ import { Button } from '#/components/ui/button'
 import { Empty, EmptyDescription, EmptyHeader } from '#/components/ui/empty'
 import {
   catalystLabel,
-  nextCatalystsBySymbol,
   type Catalyst,
 } from '../domain/catalyst'
 import { volatilityVerdict, type Ticker } from '../domain/market'
@@ -13,17 +12,16 @@ import { volatilityVerdict, type Ticker } from '../domain/market'
  * It is drawn only once something is pinned, so its empty state speaks to pins, not their absence.
  */
 export function CatalystStories({
-  catalysts,
+  nextCatalysts,
   now,
   onSelect,
   tickers,
 }: {
-  catalysts: readonly Catalyst[]
+  nextCatalysts: ReadonlyMap<string, Catalyst>
   now: Date
   onSelect: (symbol: string) => void
   tickers: readonly Ticker[]
 }) {
-  const nextCatalysts = nextCatalystsBySymbol(catalysts, now)
   const visible = tickers
     .flatMap((ticker) => {
       const catalyst = nextCatalysts.get(ticker.symbol)

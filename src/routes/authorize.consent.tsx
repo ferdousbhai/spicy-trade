@@ -31,6 +31,7 @@ export const Route = createFileRoute('/authorize/consent')({
  */
 const ConsentResponseSchema = z.object({ redirect: z.boolean(), url: z.string().min(1) })
 const FailureSchema = z.object({ error_description: z.string().min(1) })
+const ANSWER_NOT_RECORDED = 'spicy.trade could not record that answer.'
 
 function ConsentPage() {
   const viewer = useViewer()
@@ -60,16 +61,16 @@ function ConsentPage() {
         // Say what the provider said. A generic message here is how a refused consent looked
         // like a button that did nothing at all.
         const reason = FailureSchema.safeParse(await response.json().catch(() => undefined))
-        throw new Error(reason.success ? reason.data.error_description : 'spicy.trade could not record that answer.')
+        throw new Error(reason.success ? reason.data.error_description : ANSWER_NOT_RECORDED)
       }
       // A success whose body is not the shape this page reads is reported in our words, never as
       // the parser's own output.
       const consented = ConsentResponseSchema.safeParse(await response.json().catch(() => undefined))
-      if (!consented.success) throw new Error('spicy.trade could not record that answer.')
+      if (!consented.success) throw new Error(ANSWER_NOT_RECORDED)
       window.location.replace(consented.data.url)
     } catch (error) {
       setSubmitting(undefined)
-      setFailure(error instanceof Error ? error.message : 'spicy.trade could not record that answer.')
+      setFailure(error instanceof Error ? error.message : ANSWER_NOT_RECORDED)
     }
   }
 

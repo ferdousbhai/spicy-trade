@@ -268,8 +268,7 @@ export function TopBar({
             </span>
           </>
         )}
-        {/* The age matters while quotes move. Outside the session the bar counts down instead,
-            and each reading's own age is stated on the card that shows it. */}
+        {/* The age matters while quotes move; outside the session each reading's own age is stated on the card that shows it. */}
         {updated && marketState === 'open' && (
           <span className="last-updated" title={`Quotes last updated ${lastUpdatedAt}`}>
             <span className="last-updated-word">Updated </span>{updated}

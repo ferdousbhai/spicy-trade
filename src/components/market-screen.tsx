@@ -39,7 +39,6 @@ import {
   formatMarketPrice,
   issuerName,
   tickerFromPublic,
-  termStructureSpread,
   volatilityVerdict,
   type IvTermStructure,
   type Ticker,
@@ -75,11 +74,11 @@ const compactFormatter = new Intl.NumberFormat('en-US', {
   notation: 'compact',
 })
 
-function compactMetric(value: number | undefined, prefix = '', suffix = ''): string {
-  return value === undefined ? '—' : `${prefix}${compactFormatter.format(value)}${suffix}`
+function compactMetric(value: number | undefined, prefix = ''): string {
+  return value === undefined ? '—' : `${prefix}${compactFormatter.format(value)}`
 }
 
-function formatSignedMetric(value: number | undefined, suffix = ''): string {
+function formatSignedMetric(value: number | undefined, suffix: string): string {
   if (value === undefined) return '—'
   return `${value > 0 ? '+' : ''}${formatMarketMetric(value)}${suffix}`
 }
@@ -90,6 +89,7 @@ function assetLabel(ticker: Pick<Ticker, 'assetType'>): string | undefined {
 
 type SortDirection = 'asc' | 'desc'
 type SortKey = 'symbol' | 'marketCap' | 'price' | 'year' | 'volume' | 'premium' | 'liquidity'
+type Sort = { direction: SortDirection; key: SortKey }
 
 /** The breakpoint the year column appears at, so nothing loads history a screen cannot show. */
 const WIDE_VIEWPORT = '(min-width: 1120px)'
@@ -119,10 +119,13 @@ function useMediaQuery(query: string): boolean {
  * What the pill beside a listed price shows. One tap cycles every row together, the way a phone
  * stocks app does, so a reader compares the list on any of these without it growing a column.
  * Day change leads because it is what a glance at a list is for; the rest are the table's own
- * columns in the order the table sorts them.
+ * columns.
  */
 type ListMetric = 'change' | 'premium' | 'volume' | 'marketCap'
 const LIST_METRICS: readonly ListMetric[] = ['change', 'premium', 'volume', 'marketCap']
+function nextListMetric(metric: ListMetric): ListMetric {
+  return LIST_METRICS[(LIST_METRICS.indexOf(metric) + 1) % LIST_METRICS.length]!
+}
 const LIST_METRIC_LABELS = {
   change: 'Day change',
   marketCap: 'Market cap',
@@ -131,6 +134,10 @@ const LIST_METRIC_LABELS = {
 } satisfies Record<ListMetric, string>
 
 type ListPill = { tone: 'down' | 'flat' | 'up' | VolatilityVerdict; value: string }
+
+function changeTone(percent: number): 'up' | 'down' | 'flat' {
+  return percent > 0 ? 'up' : percent < 0 ? 'down' : 'flat'
+}
 
 /**
  * How old a row's volatility readings are, read at render. Rows re-render with every snapshot
@@ -144,7 +151,7 @@ function listPill(ticker: Ticker, metric: ListMetric): ListPill {
   switch (metric) {
     case 'change':
       return {
-        tone: ticker.changePercent > 0 ? 'up' : ticker.changePercent < 0 ? 'down' : 'flat',
+        tone: changeTone(ticker.changePercent),
         value: formatSignedMetric(ticker.changePercent, '%'),
       }
     case 'premium': {
@@ -210,12 +217,12 @@ function sparkY(value: number, low: number, span: number): number {
 /**
  * A year of daily closes reads on its own elapsed span rather than a fixed one: the series is
  * whatever the cache holds, so stretching it to the full width is honest here in a way it is
- * not for a session that has barely started.
+ * not for a session that has barely started. The caller guarantees at least two closes.
  */
 function YearSparkline({ closes }: { closes: readonly number[] }) {
   const low = Math.min(...closes)
   const span = Math.max(...closes) - low || 1
-  const step = closes.length > 1 ? SPARK_WIDTH / (closes.length - 1) : 0
+  const step = SPARK_WIDTH / (closes.length - 1)
   const line = closes
     .map((close, index) => `${(index * step).toFixed(2)},${sparkY(close, low, span).toFixed(2)}`)
     .join(' ')
@@ -260,7 +267,7 @@ const SORT_METRICS = {
   liquidity: (ticker) => ticker.liquidity,
 } satisfies Record<Exclude<SortKey, 'symbol'>, (ticker: Ticker) => number | undefined>
 
-function compareBySort(left: Ticker, right: Ticker, sort: { direction: SortDirection; key: SortKey }): number {
+function compareBySort(left: Ticker, right: Ticker, sort: Sort): number {
   if (sort.key === 'symbol') {
     const delta = left.symbol.localeCompare(right.symbol)
     return sort.direction === 'asc' ? delta : -delta
@@ -275,7 +282,7 @@ function compareBySort(left: Ticker, right: Ticker, sort: { direction: SortDirec
 }
 
 function termStructureLabel(term: IvTermStructure): string {
-  const spread = termStructureSpread(term)
+  const spread = term.frontIv - term.backIv // positive: front over back
   if (Math.abs(spread) < 1) return 'Flat'
   return spread > 0
     ? `Front +${formatMarketMetric(spread)} pts`
@@ -292,6 +299,10 @@ function formatIfReported<T>(reading: T | undefined, format: (reading: T) => str
   return reading === undefined ? undefined : format(reading)
 }
 
+function liquidityLabel(ticker: Pick<Ticker, 'liquidity'>): string | undefined {
+  return formatIfReported(ticker.liquidity, (liquidity) => `${formatMarketMetric(liquidity)}/5`)
+}
+
 function focusTape(ticker: Ticker): Array<[label: string, value: string]> {
   const reported: Array<[label: string, value: string | undefined]> = [
     ['IV', formatIfReported(ticker.ivIndex, (iv) => `${formatMarketMetric(iv)}%`)],
@@ -301,17 +312,13 @@ function focusTape(ticker: Ticker): Array<[label: string, value: string]> {
     ['Rank', formatIfReported(ticker.ivRank, formatMarketMetric)],
     ['Pct', formatIfReported(ticker.ivPercentile, formatMarketMetric)],
     ['Term', formatIfReported(ticker.ivTermStructure, termStructureLabel)],
-    ['Liq', formatIfReported(ticker.liquidity, (liquidity) => `${formatMarketMetric(liquidity)}/5`)],
+    ['Liq', liquidityLabel(ticker)],
     ['Lend', ticker.lendability],
-    ['Vol', formatIfReported(ticker.volume, (volume) => compactMetric(volume))],
+    ['Vol', formatIfReported(ticker.volume, compactMetric)],
     ['Cap', formatIfReported(ticker.marketCap, (cap) => compactMetric(cap, '$'))],
     ['52w', yearRangeLabel(ticker)],
   ]
-  const tape: Array<[label: string, value: string]> = []
-  for (const [label, value] of reported) {
-    if (value !== undefined) tape.push([label, value])
-  }
-  return tape
+  return reported.filter((entry): entry is [label: string, value: string] => entry[1] !== undefined)
 }
 
 /** The table's empty state and the status line above a partial list say the same thing. */
@@ -406,44 +413,61 @@ function CatalystRunway({
     <section className="focus-runway" aria-label="What&rsquo;s coming">
       {upcoming.length
         ? (
-            <ol className="runway">
-              {upcoming.map((catalyst, index) => {
-                const source = catalystSourceLink(catalyst)
-                return (
-                  <li className={cn('runway-event', catalyst.confidence, index === 0 && 'next')} key={catalyst.id}>
-                    <div className="runway-when">
-                      <strong>{catalystCountdown(catalyst, now)}</strong>
-                      <time dateTime={catalyst.date}>
-                        {formatCalendarDay(catalyst.date)}
-                      </time>
-                    </div>
-                    <span aria-hidden="true" className="runway-mark" />
-                    <div className="runway-body">
-                      {/* The date the source last stated this, so an estimate that has not been
-                          revisited in months reads as exactly that. */}
-                      <p className="runway-kind">
-                        <span>
-                          {[catalystKindName(catalyst.kind), catalystTimingLabel(catalyst.timing)]
-                            .filter(Boolean)
-                            .join(' · ')}
-                        </span>
-                        <span>
-                          {catalyst.confidence} · as of{' '}
-                          <time dateTime={catalyst.updatedAt}>{nyDate.format(new Date(catalyst.updatedAt))}</time>
-                        </span>
-                      </p>
-                      <strong>{catalyst.title}</strong>
-                      {catalyst.description && <p className="runway-detail">{catalyst.description}</p>}
-                      {source && (
-                        <a href={source.url} rel="noreferrer" target="_blank">
-                          {source.host}<ArrowUpRight aria-hidden="true" />
-                        </a>
-                      )}
-                    </div>
-                  </li>
-                )
-              })}
-            </ol>
+            <>
+              <ol className="runway">
+                {upcoming.map((catalyst, index) => {
+                  const source = catalystSourceLink(catalyst)
+                  return (
+                    <li className={cn('runway-event', catalyst.confidence, index === 0 && 'next')} key={catalyst.id}>
+                      <div className="runway-when">
+                        <strong>{catalystCountdown(catalyst, now)}</strong>
+                        <time dateTime={catalyst.date}>
+                          {formatCalendarDay(catalyst.date)}
+                        </time>
+                      </div>
+                      <span aria-hidden="true" className="runway-mark" />
+                      <div className="runway-body">
+                        {/* The date the source last stated this, so an estimate that has not been
+                            revisited in months reads as exactly that. */}
+                        <p className="runway-kind">
+                          <span>
+                            {[catalystKindName(catalyst.kind), catalystTimingLabel(catalyst.timing)]
+                              .filter(Boolean)
+                              .join(' · ')}
+                          </span>
+                          <span>
+                            {catalyst.confidence} · as of{' '}
+                            <time dateTime={catalyst.updatedAt}>{nyDate.format(new Date(catalyst.updatedAt))}</time>
+                          </span>
+                        </p>
+                        <strong>{catalyst.title}</strong>
+                        {catalyst.description && <p className="runway-detail">{catalyst.description}</p>}
+                        {source && (
+                          <a href={source.url} rel="noreferrer" target="_blank">
+                            {source.host}<ArrowUpRight aria-hidden="true" />
+                          </a>
+                        )}
+                      </div>
+                    </li>
+                  )
+                })}
+              </ol>
+              {searching && (
+                <p className="runway-searching" aria-live="polite">
+                  <span aria-hidden="true" /> Searching for nearer {CATALYST_SCOPE} dates…
+                </p>
+              )}
+              {failed && !searching && (
+                <p className="runway-searching" aria-live="polite">
+                  The search for nearer {CATALYST_SCOPE} dates didn’t finish.
+                </p>
+              )}
+              {readFailed && (
+                <p className="runway-searching" aria-live="polite">
+                  {symbol}’s full calendar didn’t load; these are the dates spicy.trade already had.
+                </p>
+              )}
+            </>
           )
         : (
             <RunwayEmpty
@@ -454,21 +478,6 @@ function CatalystRunway({
               symbol={symbol}
             />
           )}
-      {searching && upcoming.length > 0 && (
-        <p className="runway-searching" aria-live="polite">
-          <span aria-hidden="true" /> Searching for nearer {CATALYST_SCOPE} dates…
-        </p>
-      )}
-      {failed && !searching && upcoming.length > 0 && (
-        <p className="runway-searching" aria-live="polite">
-          The search for nearer {CATALYST_SCOPE} dates didn’t finish.
-        </p>
-      )}
-      {readFailed && upcoming.length > 0 && (
-        <p className="runway-searching" aria-live="polite">
-          {symbol}’s full calendar didn’t load; these are the dates spicy.trade already had.
-        </p>
-      )}
       {/* A search runs at most once a month for any symbol, so coverage can read thin long
           after the web has something to say. Spending another costs money per call, which is
           why only the owner may. What it finds is stored, so every reader gets it. */}
@@ -487,7 +496,7 @@ function CatalystRunway({
  * Every card is a passage the server re-read on the page it cites, so the quote is the source's
  * own words; the note beside it is the recorder's reading and is labelled as theirs. Nothing
  * renders when nothing has been recorded: an empty state here would explain a surface a reader
- * has no way to fill, and the runway above it already says what is known about the name.
+ * has no way to fill, and the runway already says what is known about the name.
  */
 function EvidenceCards({ symbol }: { symbol: string }) {
   // The answer carries the symbol it answers, so the cards of the name a reader just left can
@@ -508,11 +517,11 @@ function EvidenceCards({ symbol }: { symbol: string }) {
   }, [attempt, symbol])
 
   const current = answer?.symbol === symbol ? answer : undefined
-  const failed = Boolean(current && 'failed' in current)
+  const failed = current !== undefined && 'failed' in current
   // A failed read is asked again when the window regains focus, as the calendar and year series
   // are; a mounted card otherwise kept its failure for as long as the symbol stayed selected.
   useRetryOnFocus(failed, () => setAttempt((count) => count + 1))
-  if (current && 'failed' in current) {
+  if (failed) {
     return (
       <section className="focus-evidence" aria-label="Evidence">
         <p className="evidence-unavailable">Evidence unavailable</p>
@@ -593,10 +602,11 @@ function InstrumentButton({
   const copy = verdictCopy[volatilityVerdict(ticker)]
   const type = assetLabel(ticker)
   const ivRank = ticker.ivRank === undefined ? '—' : formatMarketMetric(ticker.ivRank)
+  const issuer = issuerName(ticker.name)
 
   return (
     <Button
-      aria-label={`${ticker.symbol}, ${issuerName(ticker.name)}, ${copy} option premium, IV rank ${ivRank}`}
+      aria-label={`${ticker.symbol}, ${issuer}, ${copy} option premium, IV rank ${ivRank}`}
       aria-pressed={isSelected}
       className="ticker-table-button"
       onClick={() => onSelect(ticker.symbol)}
@@ -607,7 +617,7 @@ function InstrumentButton({
         <strong>{ticker.symbol}</strong>
         {type ? <small>{type}</small> : null}
       </span>
-      <small>{issuerName(ticker.name)}</small>
+      <small>{issuer}</small>
       {catalyst ? <small>{catalystLabel(catalyst, now)}</small> : null}
     </Button>
   )
@@ -636,7 +646,6 @@ const MarketTickerRow = memo(function MarketTickerRow({
   yearCloses?: readonly number[]
 }) {
   const verdict = volatilityVerdict(ticker)
-  const copy = verdictCopy[verdict]
   const rangePosition = fiftyTwoWeekPosition(ticker)
   const session = latestSessionCandles(ticker.sparkline)
 
@@ -659,15 +668,14 @@ const MarketTickerRow = memo(function MarketTickerRow({
       </TableCell>
       <TableCell className="price-cell">
         <div className="price-session">
-          {/* Snapshot quotes carry two synthetic endpoints; only render a chart for a richer live candle series. */}
+          {/* Only a live candle series draws a session chart. */}
           {session.length > 2 ? <Sparkline session={session} /> : null}
           <span>
             <strong>{formatMarketPrice(ticker.price)}</strong>
             <small>{formatSignedMetric(ticker.changePercent, '%')}</small>
           </span>
         </div>
-        {/* An unreported reading is left out rather than announced, as the focus tape does;
-            the cell's own metric still shows an em dash so the row is never silently short. */}
+        {/* An unreported reading is left out rather than announced, as the focus tape does. */}
         {rangePosition === undefined
           ? null
           : <Progress className="price-range" aria-label={`${Math.round(rangePosition)}% of 52-week range`} value={rangePosition} />}
@@ -688,7 +696,7 @@ const MarketTickerRow = memo(function MarketTickerRow({
       <TableCell className={`premium-cell ${verdict}`}>
         <span className="premium-reading">
           <small>{formatIfReported(ticker.ivIndex, (iv) => `${formatMarketMetric(iv)}% IV`) ?? '—'}</small>
-          <strong>{copy}</strong>
+          <strong>{verdictCopy[verdict]}</strong>
         </span>
         <small>
           {[formatIfReported(ticker.ivRank, (rank) => `${formatMarketMetric(rank)} rank`) ?? '—', metricsAgeLabel(ticker)]
@@ -697,7 +705,7 @@ const MarketTickerRow = memo(function MarketTickerRow({
         </small>
       </TableCell>
       <TableCell className="liquidity-cell">
-        <strong>{formatIfReported(ticker.liquidity, (liquidity) => `${formatMarketMetric(liquidity)}/5`) ?? '—'}</strong>
+        <strong>{liquidityLabel(ticker) ?? '—'}</strong>
         {ticker.lendability ? <small>{ticker.lendability}</small> : null}
       </TableCell>
     </TableRow>
@@ -733,7 +741,7 @@ const MarketListRow = memo(function MarketListRow({
   yearCloses?: readonly number[]
 }) {
   const pill = listPill(ticker, metric)
-  const nextMetric = LIST_METRICS[(LIST_METRICS.indexOf(metric) + 1) % LIST_METRICS.length]!
+  const nextMetric = nextListMetric(metric)
   const session = latestSessionCandles(ticker.sparkline)
 
   return (
@@ -774,8 +782,8 @@ function SortControl({
   sort,
 }: {
   relevance: boolean
-  onChange: (sort: { direction: SortDirection; key: SortKey }) => void
-  sort: { direction: SortDirection; key: SortKey }
+  onChange: (sort: Sort) => void
+  sort: Sort
 }) {
   const flipped = sort.direction === 'asc' ? 'desc' : 'asc'
   return (
@@ -831,7 +839,7 @@ export function MarketScreen({
   // for labels that cannot have changed. Midday UTC falls on the same New York day, so this
   // anchor reads back as `marketDay`.
   const now = useMemo(() => new Date(`${marketDay}T12:00:00Z`), [marketDay])
-  const [sort, setSort] = useState<{ direction: SortDirection; key: SortKey }>({ direction: 'desc', key: 'volume' })
+  const [sort, setSort] = useState<Sort>({ direction: 'desc', key: 'volume' })
   const [query, setQuery] = useState('')
   const [searchSort, setSearchSort] = useState(false)
   const [listMetric, setListMetric] = useState<ListMetric>('change')
@@ -851,7 +859,7 @@ export function MarketScreen({
     ticker.symbol === trimmedQuery.toUpperCase())
   const search = useSymbolSearch(trimmedQuery, unlisted)
   const lookup = search.status === 'found' ? search.lookup : undefined
-  const found = search.status === 'found' ? tickerFromPublic(search.lookup.ticker) : undefined
+  const found = lookup && tickerFromPublic(lookup.ticker)
   const universe = found && !matched.some((ticker) => ticker.symbol === found.symbol)
     ? [found, ...matched]
     : matched
@@ -870,13 +878,11 @@ export function MarketScreen({
   // back joins the calendar on this visit rather than waiting for the next snapshot.
   const catalystSearch = useCatalystSearch(selected.symbol, catalysts, now)
   const focusedRead = usePublicCatalysts(selected.symbol)
-  const focusedCatalysts = focusedRead.catalysts
   // The year series is fetched only where something draws it: the table's year column at the
   // wide breakpoint, and every phone row, which has the room the table's middle widths lack.
   const yearCandles = useYearCandles(useMediaQuery(WIDE_VIEWPORT) || narrow)
-  const yearCloses = yearCandles.series
   const cycleListMetric = useCallback(() => {
-    setListMetric((current) => LIST_METRICS[(LIST_METRICS.indexOf(current) + 1) % LIST_METRICS.length]!)
+    setListMetric(nextListMetric)
   }, [])
   // A tap on a phone both selects and opens the detail, as a stocks app does; a wide screen
   // keeps the card beside the list and only selects.
@@ -886,15 +892,15 @@ export function MarketScreen({
   }, [narrow, selectResult])
   // The search state is a new object on every render, so the merge watches the catalysts a
   // found symbol carried rather than the state that carried them, and holds between searches.
-  const looked = search.status === 'found' ? search.lookup.catalysts : undefined
+  const looked = lookup?.catalysts
   const visibleCatalysts = useMemo(() => {
     // Later rows win by id, so a row a search just bound replaces the snapshot's copy of it.
     const merged = new Map(
-      [...catalysts, ...(looked ?? []), ...catalystSearch.catalysts, ...focusedCatalysts]
+      [...catalysts, ...(looked ?? []), ...catalystSearch.catalysts, ...focusedRead.catalysts]
         .map((catalyst) => [catalyst.id, catalyst]),
     )
     return [...merged.values()]
-  }, [catalysts, catalystSearch.catalysts, focusedCatalysts, looked])
+  }, [catalysts, catalystSearch.catalysts, focusedRead.catalysts, looked])
   const nextCatalysts = nextCatalystsBySymbol(visibleCatalysts, now)
   const toggleSort = (column: typeof SORT_COLUMNS[number]) => {
     setSearchSort(true)
@@ -942,10 +948,8 @@ export function MarketScreen({
         </CardHeader>
         <CardContent className="focus-narrative">
           {/* What a reader reads, then the numbers under it: one column dissolves this wrapper into
-              the narrative grid, and the wide layout makes it the main column, since the thesis is
-              the longest thing on the card and the runway is a compact timeline that fits the
-              rail. The metrics live here rather than in a footer row, so they follow the thesis
-              directly instead of waiting below whichever column runs longer. */}
+              the narrative grid, and the wide layout makes it the main column beside the rail
+              (see .instrument-focus in styles.css). */}
           <div className="focus-reading">
             {selectedRecommendation && (
               <section aria-labelledby="focus-recommendation-title" className="focus-recommendation">
@@ -985,11 +989,21 @@ export function MarketScreen({
       </Card>
   )
 
+  const emptyResult = (
+    <Empty className="watch-empty">
+      <EmptyHeader>
+        <EmptyDescription>
+          {searchEmptyMessage(trimmedQuery, search.status)}
+        </EmptyDescription>
+      </EmptyHeader>
+    </Empty>
+  )
+
   return (
     <div className="market-screen">
       {/* No screen spends a band on an empty rail; the star on every row says what pinning does. */}
       {pinnedTickers.length > 0 && (
-        <CatalystStories catalysts={visibleCatalysts} now={now} onSelect={selectFromList} tickers={pinnedTickers} />
+        <CatalystStories nextCatalysts={nextCatalysts} now={now} onSelect={selectFromList} tickers={pinnedTickers} />
       )}
 
       {narrow ? (
@@ -1008,7 +1022,7 @@ export function MarketScreen({
             </span>
             <span className="focus-strip-quote">
               <strong>{formatMarketPrice(selected.price)}</strong>
-              <small data-tone={selected.changePercent > 0 ? 'up' : selected.changePercent < 0 ? 'down' : 'flat'}>
+              <small data-tone={changeTone(selected.changePercent)}>
                 {formatSignedMetric(selected.changePercent, '%')}
               </small>
             </span>
@@ -1066,7 +1080,7 @@ export function MarketScreen({
             setSearchSort(true)
           }} sort={sort} relevance={relevance} />}
         </header>
-        {trimmedQuery && watchTickers.length > 0 && search.status === 'failed' && (
+        {watchTickers.length > 0 && search.status === 'failed' && (
           <p className="watch-status" role="status">{SYMBOL_SEARCH_FAILED}</p>
         )}
         {/* The year's move rides the snapshot and stays; only the chart beside it is missing,
@@ -1088,19 +1102,11 @@ export function MarketScreen({
                 onSelectTicker={selectFromList}
                 onTogglePinned={toggleResultPinned}
                 ticker={ticker}
-                yearCloses={yearCloses.get(ticker.symbol)}
+                yearCloses={yearCandles.series.get(ticker.symbol)}
               />
             ))}
             {!watchTickers.length && (
-              <li>
-                <Empty className="watch-empty">
-                  <EmptyHeader>
-                    <EmptyDescription>
-                      {searchEmptyMessage(trimmedQuery, search.status)}
-                    </EmptyDescription>
-                  </EmptyHeader>
-                </Empty>
-              </li>
+              <li>{emptyResult}</li>
             )}
           </ol>
         ) : (
@@ -1135,20 +1141,12 @@ export function MarketScreen({
                 onSelectTicker={selectResult}
                 onTogglePinned={toggleResultPinned}
                 ticker={ticker}
-                yearCloses={yearCloses.get(ticker.symbol)}
+                yearCloses={yearCandles.series.get(ticker.symbol)}
               />
             ))}
             {!watchTickers.length && (
               <TableRow>
-                <TableCell colSpan={SORT_COLUMNS.length + 1}>
-                  <Empty className="watch-empty">
-                    <EmptyHeader>
-                      <EmptyDescription>
-                        {searchEmptyMessage(trimmedQuery, search.status)}
-                      </EmptyDescription>
-                    </EmptyHeader>
-                  </Empty>
-                </TableCell>
+                <TableCell colSpan={SORT_COLUMNS.length + 1}>{emptyResult}</TableCell>
               </TableRow>
             )}
           </TableBody>

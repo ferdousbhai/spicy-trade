@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, useSyncExternalStore } from 'react'
+import { useEffect, useState, useSyncExternalStore } from 'react'
 import { z } from 'zod'
 
 import { Alert, AlertDescription, AlertTitle } from '#/components/ui/alert'
@@ -16,12 +16,12 @@ import { CopyBlock } from './copy-block'
 import { MCP_ENDPOINT } from '../domain/site'
 
 const PROXY_URL = 'http://127.0.0.1:8787/mcp'
-/** No Authorization header: the proxy attaches the keyring token so the agent holds none. */
-const PROXY_CLAUDE_COMMAND = `claude mcp add --transport http spice ${PROXY_URL}`
-const PROXY_GROK_COMMAND = `grok mcp add --transport http spice ${PROXY_URL}`
-const PROXY_CODEX_COMMAND = `codex mcp add spice --url ${PROXY_URL}`
-const CODEX_COMMAND = `codex mcp add spice --url ${MCP_ENDPOINT}`
-const GROK_COMMAND = `grok mcp add --transport http spice ${MCP_ENDPOINT}`
+const addCommands = (url: string) => ({
+  claude: `claude mcp add --transport http spice ${url}`,
+  codex: `codex mcp add spice --url ${url}`,
+  grok: `grok mcp add --transport http spice ${url}`,
+  other: undefined,
+}) satisfies Record<AgentClient, string | undefined>
 /** Reads the spicy.trade token from the keyring, so it needs the token stored first. */
 const CONNECT_TASTYTRADE_COMMAND = './ops/spice-agent/connect-tastytrade.mjs'
 
@@ -68,11 +68,6 @@ function chooseClient(next: AgentClient) {
     unstoredClient = next
   }
   for (const listener of clientListeners) listener()
-}
-
-/** The server renders the first client; the browser's stored choice takes over on hydration. */
-function useAgentClient(): [AgentClient, (client: AgentClient) => void] {
-  return [useSyncExternalStore(subscribeToClient, readClient, () => 'claude'), chooseClient]
 }
 
 function ClientPicker({ client, onChange }: { client: AgentClient; onChange: (client: AgentClient) => void }) {
@@ -126,8 +121,6 @@ function useAgentTokens() {
   const [actionError, setActionError] = useState<string>()
   /** Which action is in flight, so only its own button shows it working. */
   const [pending, setPending] = useState<{ kind: 'issue' } | { kind: 'revoke'; tokenId: string }>()
-  /** True only while the first read is in flight, so a failed read does not spin forever. */
-  const [loading, setLoading] = useState(true)
   /**
    * Shown once, held only in this component's state, never re-fetchable. Its id travels with it
    * so revoking that very token also takes it off the screen.
@@ -141,21 +134,20 @@ function useAgentTokens() {
     const controller = new AbortController()
     void fetch('/api/mcp-tokens', { credentials: 'same-origin', signal: controller.signal })
       .then((response) => readJson(response, McpTokenListResponseSchema))
-      .then((body) => {
-        setTokens(body.tokens)
-        setListError(undefined)
-      })
+      .then((body) => { setTokens(body.tokens) })
       .catch((cause: unknown) => {
         if (controller.signal.aborted) return
         setListError(toError(cause)?.message ?? 'Agent tokens are unavailable')
       })
-      .finally(() => { if (!controller.signal.aborted) setLoading(false) })
     return () => controller.abort()
   }, [])
 
+  /** True only while the first read is in flight, so a failed read does not spin forever. */
+  const loading = tokens === undefined && listError === undefined
+
   // Reports whether the token was created, so the caller can keep what the member typed when
   // it was not — a refusal at the token cap is the case where retyping the name is wasted.
-  const issue = useCallback(async (label: string): Promise<boolean> => {
+  const issue = async (label: string): Promise<boolean> => {
     setPending({ kind: 'issue' })
     try {
       const body = await readJson(await fetch('/api/mcp-tokens', {
@@ -178,9 +170,9 @@ function useAgentTokens() {
     } finally {
       setPending(undefined)
     }
-  }, [])
+  }
 
-  const revoke = useCallback(async (tokenId: string) => {
+  const revoke = async (tokenId: string) => {
     setPending({ kind: 'revoke', tokenId })
     try {
       // A revoke answers with the remaining list, so it is read here rather than fetched again.
@@ -198,7 +190,7 @@ function useAgentTokens() {
     } finally {
       setPending(undefined)
     }
-  }, [])
+  }
 
   return { actionError, issue, issued, listError, loading, pending, revoke, tokens }
 }
@@ -208,7 +200,8 @@ export function ConnectScreen({ owner }: { owner: boolean }) {
   // Every token control waits for whichever action is in flight.
   const busy = pending !== undefined
   const [label, setLabel] = useState('')
-  const [client, setClient] = useAgentClient()
+  // The server renders the first client; the browser's stored choice takes over on hydration.
+  const client = useSyncExternalStore(subscribeToClient, readClient, (): AgentClient => 'claude')
 
   // While a freshly issued token is on screen, both blocks carry it. A placeholder here made the
   // shortest path copy the token, copy the config, then splice one into the other by hand -- and
@@ -218,13 +211,13 @@ export function ConnectScreen({ owner }: { owner: boolean }) {
   const mcpConfig = JSON.stringify({
     mcpServers: { spice: { headers: { Authorization: `Bearer ${bearer}` }, type: 'http', url: MCP_ENDPOINT } },
   }, null, 2)
+  const headlessCommand = `${addCommands(MCP_ENDPOINT).claude} --header "Authorization: Bearer ${bearer}"`
   // No header. Claude Code skips the OAuth flow entirely when a static `Authorization` is
   // configured, so handing one out as the default would ship the browser sign-in and guarantee
   // nobody ever reaches it.
-  const claudeCommand = `claude mcp add --transport http spice ${MCP_ENDPOINT}`
-  const headlessCommand = `${claudeCommand} --header "Authorization: Bearer ${bearer}"`
-  const publicCommand = { claude: claudeCommand, codex: CODEX_COMMAND, grok: GROK_COMMAND, other: undefined }[client]
-  const proxyCommand = { claude: PROXY_CLAUDE_COMMAND, codex: PROXY_CODEX_COMMAND, grok: PROXY_GROK_COMMAND, other: undefined }[client]
+  const publicCommand = addCommands(MCP_ENDPOINT)[client]
+  // No Authorization header: the proxy attaches the keyring token so the agent holds none.
+  const proxyCommand = addCommands(PROXY_URL)[client]
 
   return (
     <section className="connect-screen">
@@ -242,7 +235,7 @@ export function ConnectScreen({ owner }: { owner: boolean }) {
           choice stays in reach while the commands under it change; one column dissolves it and
           the guards take their place after the steps. */}
       <aside className="connect-aside">
-        <ClientPicker client={client} onChange={setClient} />
+        <ClientPicker client={client} onChange={chooseClient} />
         <section className="connect-step connect-guards">
           <h2>What the agent cannot do</h2>
           <p>

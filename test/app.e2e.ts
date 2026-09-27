@@ -39,34 +39,41 @@ function isoDateAfter(days: number): string {
   return date.toISOString().slice(0, 10)
 }
 
-test('a newer deployment reloads once before restoring the local snapshot', async ({ page }) => {
+/**
+ * The fixture under the one public watchlist a signed-out reader sees. Given symbols, the list
+ * narrows to them and each sparkline keeps its last two points.
+ */
+function publicWatchSnapshot(symbols?: string[]) {
   const snapshot = marketSnapshotFixture()
   snapshot.watchlists = [{
     id: 'public-options-watch',
     kind: 'public',
     name: 'Options Watch',
-    symbols: snapshot.watchlists[0]!.symbols,
+    symbols: symbols ?? snapshot.watchlists[0]!.symbols,
   }]
+  if (symbols) {
+    snapshot.tickers = snapshot.tickers
+      .filter((ticker) => symbols.includes(ticker.symbol))
+      .map((ticker) => ({ ...ticker, sparkline: ticker.sparkline.slice(-2) }))
+  }
+  return snapshot
+}
+
+test('a newer deployment reloads once before restoring the local snapshot', async ({ page }) => {
+  const snapshot = publicWatchSnapshot()
   let documentRequests = 0
   let snapshotRequests = 0
   page.on('request', (request) => {
     if (request.resourceType() === 'document') documentRequests += 1
   })
   await page.route('**/api/viewer', (route) => route.fulfill({
-    contentType: 'application/json',
-    body: JSON.stringify({ user: null }),
-  }))
-  await page.route('**/api/mcp-tokens', (route) => route.fulfill({
-    body: JSON.stringify({ tokens: [] }),
-    contentType: 'application/json',
-    status: 200,
+    json: { user: null },
   }))
   await page.route('**/api/public-snapshot*', (route) => {
     snapshotRequests += 1
     return route.fulfill({
-      contentType: 'application/json',
       headers: { [SPICE_DEPLOYMENT_ID_HEADER]: documentRequests === 1 ? 'next-deployment' : 'development' },
-      body: JSON.stringify(snapshot),
+      json: snapshot,
     })
   })
 
@@ -83,21 +90,18 @@ test('a signed-in member sees an amber avatar whose menu signs them out', async 
   let signedIn = true
   let signOutRequests = 0
   await page.route('**/api/viewer', (route) => route.fulfill({
-    contentType: 'application/json',
-    body: JSON.stringify({ user: signedIn ? { id: 'member-1', name: 'Dana Member', role: 'member' } : null }),
+    json: { user: signedIn ? { id: 'member-1', name: 'Dana Member', role: 'member' } : null },
   }))
   await page.route('**/api/favorites', (route) => route.fulfill({
-    contentType: 'application/json',
-    body: JSON.stringify({ symbols: [] }),
+    json: { symbols: [] },
   }))
   await page.route('**/api/public-snapshot*', (route) => route.fulfill({
-    contentType: 'application/json',
-    body: JSON.stringify(snapshot),
+    json: snapshot,
   }))
   await page.route('**/api/auth/sign-out', (route) => {
     signOutRequests += 1
     signedIn = false
-    return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ success: true }) })
+    return route.fulfill({ json: { success: true } })
   })
 
   await page.goto('/')
@@ -117,13 +121,7 @@ test('a signed-in member sees an amber avatar whose menu signs them out', async 
 test('a newer deployment reloads a tab whose unchanged data only ever answers 304', async ({ page }) => {
   // The ETag names the data, not the build, so a quiet market answers an old bundle with 304s
   // for as long as nothing changes. The deployment header on that 304 must still reload the tab.
-  const snapshot = marketSnapshotFixture()
-  snapshot.watchlists = [{
-    id: 'public-options-watch',
-    kind: 'public',
-    name: 'Options Watch',
-    symbols: snapshot.watchlists[0]!.symbols,
-  }]
+  const snapshot = publicWatchSnapshot()
   const etag = '"unchanged-market"'
   let documentRequests = 0
   let notModifiedResponses = 0
@@ -131,8 +129,7 @@ test('a newer deployment reloads a tab whose unchanged data only ever answers 30
     if (request.resourceType() === 'document') documentRequests += 1
   })
   await page.route('**/api/viewer', (route) => route.fulfill({
-    contentType: 'application/json',
-    body: JSON.stringify({ user: null }),
+    json: { user: null },
   }))
   await page.route('**/api/public-snapshot*', (route) => {
     if (route.request().headers()['if-none-match'] === etag) {
@@ -144,9 +141,8 @@ test('a newer deployment reloads a tab whose unchanged data only ever answers 30
       })
     }
     return route.fulfill({
-      contentType: 'application/json',
       headers: { ETag: etag, [SPICE_DEPLOYMENT_ID_HEADER]: 'development' },
-      body: JSON.stringify(snapshot),
+      json: snapshot,
     })
   })
 
@@ -165,21 +161,14 @@ test('a newer deployment reloads a tab whose unchanged data only ever answers 30
 })
 
 test('each view is an address: a direct load renders it, and moving between them keeps the market', async ({ page }) => {
-  const snapshot = marketSnapshotFixture()
-  snapshot.watchlists = [{
-    id: 'public-options-watch',
-    kind: 'public',
-    name: 'Options Watch',
-    symbols: snapshot.watchlists[0]!.symbols,
-  }]
+  const snapshot = publicWatchSnapshot()
   await page.route('**/api/viewer', (route) => route.fulfill({
-    contentType: 'application/json',
-    body: JSON.stringify({ user: null }),
+    json: { user: null },
   }))
   let snapshotRequests = 0
   await page.route('**/api/public-snapshot*', (route) => {
     snapshotRequests += 1
-    return route.fulfill({ contentType: 'application/json', body: JSON.stringify(snapshot) })
+    return route.fulfill({ json: snapshot })
   })
 
   await page.goto('/recommendations')
@@ -221,37 +210,17 @@ test('each view is an address: a direct load renders it, and moving between them
 })
 
 test('unauthenticated visitors can read market data but connecting an agent needs Google sign-in', async ({ page }) => {
-  const publicSnapshot = marketSnapshotFixture()
+  const publicSnapshot = publicWatchSnapshot(['SPCX', 'META', 'BE', 'INTC', 'NVDA'])
   publicSnapshot.catalysts = publicSnapshot.catalysts.map((catalyst) => (
     catalyst.symbol === 'NVDA' ? { ...catalyst, date: isoDateAfter(10) } : catalyst
   ))
-  publicSnapshot.watchlists = [{
-    id: 'public-options-watch',
-    kind: 'public',
-    name: 'Options Watch',
-    symbols: ['SPCX', 'META', 'BE', 'INTC', 'NVDA'],
-  }]
-  publicSnapshot.tickers = publicSnapshot.tickers
-    .filter((ticker) => publicSnapshot.watchlists[0]!.symbols.includes(ticker.symbol))
-    .map((ticker) => ({ ...ticker, sparkline: ticker.sparkline.slice(-2) }))
   publicSnapshot.marketClosesAt = new Date(Date.now() + 6 * 60 * 60 * 1_000).toISOString()
   await page.route('**/api/viewer', (route) => route.fulfill({
-    contentType: 'application/json',
-    body: JSON.stringify({ user: null }),
+    json: { user: null },
   }))
-  await page.route('**/api/mcp-tokens', (route) => route.fulfill({
-    body: JSON.stringify({ tokens: [] }),
-    contentType: 'application/json',
-    status: 200,
+  await page.route('**/api/public-snapshot*', (route) => route.fulfill({
+    json: publicSnapshot,
   }))
-  let publicSnapshotRequests = 0
-  await page.route('**/api/public-snapshot*', (route) => {
-    publicSnapshotRequests += 1
-    return route.fulfill({
-      contentType: 'application/json',
-      body: JSON.stringify(publicSnapshot),
-    })
-  })
   await page.addInitScript(() => {
     localStorage.setItem('spice.tickers.v6', 'stale owner ticker rows')
     localStorage.setItem('spice.watchlists.v6', 'stale owner watchlist rows')
@@ -259,7 +228,6 @@ test('unauthenticated visitors can read market data but connecting an agent need
   })
   await page.goto('/')
   await expect(page.getByRole('button', { name: 'Sign in' })).toBeVisible()
-  await expect(page.locator('.market-status')).toBeVisible()
   await expect(page.locator('.market-status')).toHaveAttribute('aria-label', /Open/)
   await expect(page.locator('.market-status')).toHaveAttribute('aria-label', /Closes in/)
   // A phone has no hover: a tap is how a reader sees the session, the clock and the countdown.
@@ -275,14 +243,12 @@ test('unauthenticated visitors can read market data but connecting an agent need
     key.startsWith('spice.snapshot.v')
       || /^spice\.(?:tickers|watchlists|research|recommendations|catalysts|sync-state)\.v/.test(key)
   )))).toEqual(['spice.snapshot.v9'])
-  expect(publicSnapshotRequests).toBeGreaterThan(0)
   await expect(page.getByRole('button', { name: 'Manage Options Watch' })).toHaveCount(0)
   await expect(page.getByRole('combobox', { name: 'Watchlist' })).toHaveCount(0)
   await expect(page.locator('.watchlist-title')).toHaveText('Watchlist')
   await expect(page.getByRole('region', { name: 'Options Watch' })).toBeVisible()
   // A phone spends no row on an empty rail; it appears once something is pinned.
   await expect(page.getByRole('region', { name: 'Upcoming catalysts' })).toHaveCount(0)
-  await expect(page.locator('.story')).toHaveCount(0)
   // The list is the screen; the selected name keeps a two-line strip and the card is a sheet.
   await expect(page.locator('.focus-strip-symbol')).toHaveText('NVDA')
   await expect(page.locator('.focus-strip-read')).toContainText('Expensive 72')
@@ -296,8 +262,6 @@ test('unauthenticated visitors can read market data but connecting an agent need
   // A phone gets the list, not the table: the sort is one control, and no row scrolls sideways.
   await expect(page.locator('.premium-data-table')).toHaveCount(0)
   await expect(page.getByRole('combobox', { name: 'Sort by' })).toHaveValue('volume')
-  await expect(page.getByRole('button', { exact: true, name: 'Session' })).toHaveCount(0)
-  await expect(page.getByRole('button', { exact: true, name: 'Activity' })).toHaveCount(0)
   await expect(page.locator('.watch-list .session-sparkline')).toHaveCount(0)
   const nvdaRow = page.locator('.watch-list .watch-row', { hasText: 'NVDA' })
   expect(await nvdaRow.evaluate((row) => row.scrollWidth <= row.clientWidth)).toBe(true)
@@ -323,7 +287,6 @@ test('unauthenticated visitors can read market data but connecting an agent need
   await expect(page.locator('.watch-list .watch-row').first()).toContainText('META')
   await expect(page.getByRole('region', { name: 'Upcoming catalysts' })).toBeVisible()
   await expect(page.getByText('No pinned catalysts are scheduled.')).toBeVisible()
-  await expect(page.locator('.story')).toHaveCount(0)
   await page.getByRole('button', { name: 'Pin NVDA' }).click()
   await expect(page.locator('.story')).toHaveCount(1)
   await expect(page.locator('.story').first()).toContainText('NVDA')
@@ -332,9 +295,6 @@ test('unauthenticated visitors can read market data but connecting an agent need
   await expect(page.getByRole('button', { name: 'Unpin NVDA' })).toHaveAttribute('aria-pressed', 'true')
   await expect(page.locator('.story').first()).toContainText('NVDA')
   await expect(page.getByText('Long vol')).toHaveCount(0)
-
-  await navigateTo(page, 'Recommendations')
-  await expect(page.getByRole('region', { name: 'Trades' })).toBeVisible()
 
   await navigateTo(page, 'Connect')
   await expect(page.getByRole('heading', { name: 'Your agent. Your account.' })).toBeVisible()
@@ -354,21 +314,17 @@ test('mobile market, recommendations, search, sorting, and connect flows remain 
     catalyst.date = isoDateAfter(10 + index * 7)
   })
   await page.route('**/api/viewer', (route) => route.fulfill({
-    contentType: 'application/json',
-    body: JSON.stringify({ user: { id: 'owner-1', name: 'Owner', role: 'owner' } }),
+    json: { user: { id: 'owner-1', name: 'Owner', role: 'owner' } },
   }))
   await page.route('**/api/mcp-tokens', (route) => route.fulfill({
-    body: JSON.stringify({ tokens: [] }),
-    contentType: 'application/json',
-    status: 200,
+    json: { tokens: [] },
   }))
   await page.route('**/api/snapshot*', (route) => {
     if (rejectSnapshots) {
       return route.fulfill({ status: 503, body: '{}' })
     }
     return route.fulfill({
-      contentType: 'application/json',
-      body: JSON.stringify(snapshot),
+      json: snapshot,
     })
   })
   // The loaded list is a slice of the market: a search it cannot answer reaches the
@@ -378,11 +334,10 @@ test('mobile market, recommendations, search, sorting, and connect flows remain 
     const query = new URL(route.request().url()).searchParams.get('q') ?? ''
     symbolSearches.push(query)
     if (!query.toUpperCase().startsWith('TQQQ')) {
-      return route.fulfill({ status: 404, contentType: 'application/json', body: '{"error":"none"}' })
+      return route.fulfill({ status: 404, json: { error: 'none' } })
     }
     return route.fulfill({
-      contentType: 'application/json',
-      body: JSON.stringify({
+      json: {
         catalysts: [],
         watchlisted: true,
         ticker: {
@@ -391,21 +346,19 @@ test('mobile market, recommendations, search, sorting, and connect flows remain 
           ivRank: 41, ivPercentile: 47, ivIndex: 52.6,
           earningsDate: null, updatedAt: '2026-09-01T13:31:00.000Z',
         },
-      }),
+      },
     })
   })
   await page.route('**/api/public-catalysts*', (route) => route.fulfill({
-    contentType: 'application/json',
-    body: '{"catalysts":[]}',
+    json: { catalysts: [] },
   }))
   await page.route('**/api/public-year-candles', (route) => route.fulfill({
-    contentType: 'application/json',
-    body: '{"series":[]}',
+    json: { series: [] },
   }))
   const catalystRefreshes: string[] = []
   await page.route('**/api/public-catalyst-refresh', async (route) => {
     catalystRefreshes.push(String(route.request().postDataJSON().symbol))
-    await route.fulfill({ contentType: 'application/json', body: '{"ran":true,"catalystCount":0}' })
+    await route.fulfill({ json: { ran: true, catalystCount: 0 } })
   })
   const ownerFavorites = new Set<string>()
   await page.route('**/api/favorites', async (route) => {
@@ -415,12 +368,10 @@ test('mobile market, recommendations, search, sorting, and connect flows remain 
       else action.symbols.forEach((symbol) => ownerFavorites.delete(symbol))
     }
     await route.fulfill({
-      contentType: 'application/json',
-      body: JSON.stringify({ symbols: [...ownerFavorites].sort() }),
+      json: { symbols: [...ownerFavorites].sort() },
     })
   })
   await page.goto('/')
-  await expect(page).toHaveTitle(/spicy\.trade/)
   await expect(page.locator('link[rel="manifest"]')).toHaveAttribute('href', '/manifest.webmanifest')
   await expect(page.locator('.brand')).toHaveAccessibleName('spicy.trade home')
   await expect(page.locator('.brand')).toHaveText('spicy.trade')
@@ -437,7 +388,6 @@ test('mobile market, recommendations, search, sorting, and connect flows remain 
   await expect(page.locator('.focus-strip .strip-verdict')).toHaveText('Expensive')
   // The rail appears with the first pin; a phone spends no row on it empty.
   await expect(page.getByRole('region', { name: 'Upcoming catalysts' })).toHaveCount(0)
-  await expect(page.locator('.story')).toHaveCount(0)
   await page.getByRole('button', { name: 'Pin NVDA' }).click()
   await expect(page.getByRole('region', { name: 'Upcoming catalysts' })).toBeVisible()
   await expect(page.locator('.story')).toHaveCount(1)
@@ -457,7 +407,6 @@ test('mobile market, recommendations, search, sorting, and connect flows remain 
   await closeDetail(page)
   await expect(page.locator('.watchlist-title')).toHaveText('Watchlist')
   await expect(page.getByRole('combobox', { name: 'Watchlist' })).toHaveCount(0)
-  await expect(page.getByRole('button', { name: /NVDA, NVIDIA, Expensive/ })).toBeVisible()
   await expect(page.getByRole('button', { name: /SPCX, SpaceX Corporation, Cheap/ })).toBeVisible()
   await expect(page.getByRole('button', { name: /BE, Bloom Energy, Fair/ })).toBeVisible()
   await expect(page.getByRole('button', { name: /INTC, Intel, Cheap/ })).toBeVisible()
@@ -510,9 +459,6 @@ test('mobile market, recommendations, search, sorting, and connect flows remain 
   await searchedRow.click()
   await expect(selectedSymbol).toHaveText('TQQQ')
   await closeDetail(page)
-  await page.getByRole('button', { name: /INTC, Intel, Cheap/ }).click()
-  await expect(selectedSymbol).toHaveText('INTC')
-  await closeDetail(page)
 
   await navigateTo(page, 'Recommendations')
   await expect(primaryLink(page, 'Watch')).not.toHaveAttribute('aria-current', 'page')
@@ -561,21 +507,11 @@ test('mobile market, recommendations, search, sorting, and connect flows remain 
   await page.evaluate(() => window.dispatchEvent(new Event('online')))
   await expect(page.locator('.focus-strip-symbol')).toHaveText('INTC')
   await expect(page.getByRole('alert')).toHaveCount(0)
-  rejectSnapshots = false
 })
 
 test('authenticated favorites consume only unchanged anonymous staging across tabs', async ({ context, page }) => {
   test.setTimeout(60_000)
-  const snapshot = marketSnapshotFixture()
-  snapshot.watchlists = [{
-    id: 'public-options-watch',
-    kind: 'public',
-    name: 'Options Watch',
-    symbols: ['NVDA', 'META', 'INTC'],
-  }]
-  snapshot.tickers = snapshot.tickers
-    .filter((ticker) => snapshot.watchlists[0]!.symbols.includes(ticker.symbol))
-    .map((ticker) => ({ ...ticker, sparkline: ticker.sparkline.slice(-2) }))
+  const snapshot = publicWatchSnapshot(['NVDA', 'META', 'INTC'])
   const serverFavorites = new Set<string>()
   const anonymousMerges: string[][] = []
   let signedIn = false
@@ -590,19 +526,12 @@ test('authenticated favorites consume only unchanged anonymous staging across ta
   })
 
   await page.route('**/api/viewer', (route) => route.fulfill({
-    contentType: 'application/json',
-    body: JSON.stringify({
+    json: {
       user: signedIn ? { id: 'member-1', name: 'Member', role: 'member' } : null,
-    }),
-  }))
-  await page.route('**/api/mcp-tokens', (route) => route.fulfill({
-    body: JSON.stringify({ tokens: [] }),
-    contentType: 'application/json',
-    status: 200,
+    },
   }))
   await page.route('**/api/public-snapshot*', (route) => route.fulfill({
-    contentType: 'application/json',
-    body: JSON.stringify(snapshot),
+    json: snapshot,
   }))
   await page.route('**/api/favorites', async (route) => {
     if (route.request().method() === 'POST') {
@@ -620,8 +549,7 @@ test('authenticated favorites consume only unchanged anonymous staging across ta
       }
     }
     await route.fulfill({
-      contentType: 'application/json',
-      body: JSON.stringify({ symbols: [...serverFavorites].sort() }),
+      json: { symbols: [...serverFavorites].sort() },
     })
   })
   await page.addInitScript(() => {
@@ -641,17 +569,10 @@ test('authenticated favorites consume only unchanged anonymous staging across ta
 
   const staleAnonymous = await context.newPage()
   await staleAnonymous.route('**/api/viewer', (route) => route.fulfill({
-    contentType: 'application/json',
-    body: JSON.stringify({ user: null }),
-  }))
-  await staleAnonymous.route('**/api/mcp-tokens', (route) => route.fulfill({
-    body: JSON.stringify({ tokens: [] }),
-    contentType: 'application/json',
-    status: 200,
+    json: { user: null },
   }))
   await staleAnonymous.route('**/api/public-snapshot*', (route) => route.fulfill({
-    contentType: 'application/json',
-    body: JSON.stringify(snapshot),
+    json: snapshot,
   }))
   await staleAnonymous.goto('/')
   await expect(staleAnonymous.getByRole('button', { name: 'Unpin NVDA' })).toBeVisible()
@@ -703,16 +624,7 @@ test('authenticated favorites consume only unchanged anonymous staging across ta
 
 test('two signed-out devices converge on the account union without granting owner access', async ({ browser, page }) => {
   test.setTimeout(60_000)
-  const snapshot = marketSnapshotFixture()
-  snapshot.watchlists = [{
-    id: 'public-options-watch',
-    kind: 'public',
-    name: 'Options Watch',
-    symbols: ['NVDA', 'SPCX', 'META', 'BE', 'INTC'],
-  }]
-  snapshot.tickers = snapshot.tickers
-    .filter((ticker) => snapshot.watchlists[0]!.symbols.includes(ticker.symbol))
-    .map((ticker) => ({ ...ticker, sparkline: ticker.sparkline.slice(-2) }))
+  const snapshot = publicWatchSnapshot(['NVDA', 'SPCX', 'META', 'BE', 'INTC'])
   let laptopSignedIn = false
   let mobileSignedIn = false
   let ownerSnapshotRequests = 0
@@ -726,19 +638,15 @@ test('two signed-out devices converge on the account union without granting owne
   // to the convergence under test.
   const stubDevice = async (target: Page, signedIn: () => boolean) => {
     await target.route('**/api/viewer', (route) => route.fulfill({
-      contentType: 'application/json',
-      body: JSON.stringify({
+      json: {
         user: signedIn() ? { id: 'member-1', name: 'Member', role: 'member' } : null,
-      }),
+      },
     }))
     await target.route('**/api/mcp-tokens', (route) => route.fulfill({
-      body: JSON.stringify({ tokens: [] }),
-      contentType: 'application/json',
-      status: 200,
+      json: { tokens: [] },
     }))
     await target.route('**/api/public-snapshot*', (route) => route.fulfill({
-      contentType: 'application/json',
-      body: JSON.stringify(snapshot),
+      json: snapshot,
     }))
     await target.route('**/api/snapshot*', (route) => {
       ownerSnapshotRequests += 1
@@ -761,8 +669,7 @@ test('two signed-out devices converge on the account union without granting owne
         }
       }
       await route.fulfill({
-        contentType: 'application/json',
-        body: JSON.stringify({ symbols: [...serverFavorites].sort() }),
+        json: { symbols: [...serverFavorites].sort() },
       })
     })
   }

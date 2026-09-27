@@ -118,7 +118,7 @@ export function BriefScreen({ latest, onSymbol }: { latest?: DailyBrief; onSymbo
   const [history, setHistory] = useState<DailyBrief[]>(() => latest ? [latest] : [])
   const [index, setIndex] = useState(0)
   const [archiveEnd, setArchiveEnd] = useState(!latest)
-  const [archiveError, setArchiveError] = useState<string>()
+  const [archiveFailed, setArchiveFailed] = useState(false)
   const [loading, setLoading] = useState(false)
   const current = history[index]
   // Moving between issues replaces the page under the reader, so focus follows to the new
@@ -137,7 +137,7 @@ export function BriefScreen({ latest, onSymbol }: { latest?: DailyBrief; onSymbo
       return
     }
     if (!current) return
-    setArchiveError(undefined)
+    setArchiveFailed(false)
     setLoading(true)
     try {
       const previous = await loadPreviousDailyBrief(current.marketDate)
@@ -150,7 +150,7 @@ export function BriefScreen({ latest, onSymbol }: { latest?: DailyBrief; onSymbo
       setIndex(index + 1)
       setMoved(true)
     } catch {
-      setArchiveError('Previous briefs could not be loaded.')
+      setArchiveFailed(true)
     } finally {
       setLoading(false)
     }
@@ -162,15 +162,15 @@ export function BriefScreen({ latest, onSymbol }: { latest?: DailyBrief; onSymbo
         <BriefNavigation
           index={index}
           loading={loading}
-          onNewer={() => { setArchiveError(undefined); setIndex(Math.max(0, index - 1)); setMoved(true) }}
+          onNewer={() => { setArchiveFailed(false); setIndex(Math.max(0, index - 1)); setMoved(true) }}
           onOlder={() => void openOlder()}
           olderDisabled={archiveEnd && !history[index + 1]}
         />
       )}
-      {archiveError && (
+      {archiveFailed && (
         <Alert className="archive-error" variant="destructive">
           <AlertTitle>Archive unavailable</AlertTitle>
-          <AlertDescription>{archiveError}</AlertDescription>
+          <AlertDescription>Previous briefs could not be loaded.</AlertDescription>
         </Alert>
       )}
       {current

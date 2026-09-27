@@ -75,10 +75,7 @@ export const TickerSchema = z.object({
  * Held context reaches a reader through their own agent instead. The audiences still differ on
  * the watchlist, whose `kind` reveals provenance, so the two snapshot contracts stay distinct.
  */
-export const PublicTickerSchema = TickerSchema.omit({ earningsDate: true, sparkline: true }).extend({
-  earningsDate: z.string().nullable().optional(),
-  sparkline: z.array(CandlePointSchema).optional(),
-}).strict()
+export const PublicTickerSchema = TickerSchema.partial({ earningsDate: true, sparkline: true }).strict()
 
 /**
  * A year of daily closes, oldest first. Only the closes travel: the year chart spaces points
@@ -173,10 +170,7 @@ export function publicTickerFromTicker(ticker: Ticker): PublicTicker {
 
 /** REST never fills sparklines (those arrive on the live feed) and most names have no
  *  earnings date. Omitting the empty fields is what a visitor actually downloads. */
-export type SlimPublicTicker = Omit<PublicTicker, 'earningsDate' | 'sparkline'> & {
-  earningsDate?: string
-  sparkline?: PublicTicker['sparkline']
-}
+type SlimPublicTicker = Omit<PublicTicker, 'earningsDate'> & { earningsDate?: string }
 
 export function slimPublicTicker(ticker: PublicTicker): SlimPublicTicker {
   const { earningsDate, sparkline = [], ...rest } = ticker
@@ -216,9 +210,7 @@ export function mostActiveSymbol(
   watchlistSymbols: readonly string[] = [],
 ): string | undefined {
   const watchlist = new Set(watchlistSymbols)
-  const watchlistTickers = watchlist.size
-    ? tickers.filter((ticker) => watchlist.has(ticker.symbol))
-    : []
+  const watchlistTickers = tickers.filter((ticker) => watchlist.has(ticker.symbol))
   const candidates = watchlistTickers.length ? watchlistTickers : tickers
   return [...candidates].sort((left, right) => {
     if (left.volume === undefined || right.volume === undefined) {
@@ -277,11 +269,6 @@ export function volatilityVerdict(ticker: Pick<Ticker, 'ivRank' | 'ivPercentile'
   return 'fair'
 }
 
-/** One sign convention for the tape label: positive means front over back. */
-export function termStructureSpread(term: IvTermStructure): number {
-  return term.frontIv - term.backIv
-}
-
 const CLASS_NOUN = String.raw`(?:Common|Capital|Preferred|Ordinary|Beneficial|Subordinate|Voting|Registered|Registry|Deposit[ao]ry|Units?|Shares?|Stock|Interests?)`
 
 /*
@@ -309,9 +296,6 @@ const SECURITY_CLASS = new RegExp([
    whose own name contains "by" (Natural Grocers by Vitamin Cottage). */
 const TAPE_ABBREVIATION = /^[A-Z0-9][A-Z0-9 .,&/()-]* by (?=\S)/
 
-/* A description shouted end to end is a tape string, and abbreviates the class it appends
-   ("CATALENT INC COM", "GORES HLD XI CL A OS"). Only these rows are read this way, so an
-   issuer that merely ends in one of these letters keeps its name. */
 /**
  * A description that states the issuer twice before its class ("Sunstone Hotel Investors, Inc.
  * Sunstone Hotel Investors, Inc. Common Shares") names one issuer, so it reads once. Only an
@@ -319,6 +303,9 @@ const TAPE_ABBREVIATION = /^[A-Z0-9][A-Z0-9 .,&/()-]* by (?=\S)/
  */
 const REPEATED_NAME = /^(.+?)\s+\1$/
 
+/* A description shouted end to end is a tape string, and abbreviates the class it appends
+   ("CATALENT INC COM", "GORES HLD XI CL A OS"). Only these rows are read this way, so an
+   issuer that merely ends in one of these letters keeps its name. */
 const TAPE_CLASS = /(?: (?:COM|CM|CS|SHS|ORD|ORDA|CLA|OS|NEW|CL [A-Z]|SH [A-Z]|ORD [A-Z]))+$/
 
 /**

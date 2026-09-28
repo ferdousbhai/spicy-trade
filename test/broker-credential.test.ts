@@ -42,6 +42,41 @@ describe('request-scoped broker credential', () => {
     expect(credential).toEqual({ accessToken: 'request-token', broker: 'tastytrade' })
   })
 
+  it('reads the current header names', () => {
+    const credential = brokerCredentialFromHeaders(new Headers({
+      'X-Spicy-Trade-Broker': 'tastytrade',
+      'X-Spicy-Trade-Broker-Token': 'request-token',
+    }))
+
+    expect(credential).toEqual({ accessToken: 'request-token', broker: 'tastytrade' })
+  })
+
+  it('accepts a header sent under both names when the values agree', () => {
+    const credential = brokerCredentialFromHeaders(new Headers({
+      'X-Spice-Broker': 'tastytrade',
+      'X-Spice-Broker-Token': 'request-token',
+      'X-Spicy-Trade-Broker': 'tastytrade',
+      'X-Spicy-Trade-Broker-Token': ' request-token ',
+    }))
+
+    expect(credential).toEqual({ accessToken: 'request-token', broker: 'tastytrade' })
+  })
+
+  it.each([
+    ['tokens', {
+      'X-Spice-Broker-Token': 'old-token',
+      'X-Spicy-Trade-Broker': 'tastytrade',
+      'X-Spicy-Trade-Broker-Token': 'new-token',
+    }],
+    ['brokers', {
+      'X-Spice-Broker': 'another-broker',
+      'X-Spicy-Trade-Broker': 'tastytrade',
+      'X-Spicy-Trade-Broker-Token': 'request-token',
+    }],
+  ])('refuses %s that disagree between the old and current names', (_label, values) => {
+    expect(brokerCredentialFromHeaders(new Headers(values))).toBeUndefined()
+  })
+
   it.each([
     ['missing broker', { 'X-Spice-Broker-Token': 'request-token' }],
     ['missing token', { 'X-Spice-Broker': 'tastytrade' }],

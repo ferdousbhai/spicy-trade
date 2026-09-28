@@ -2,14 +2,14 @@ import { createHash, randomBytes } from 'node:crypto'
 import { hostname } from 'node:os'
 import { z } from 'zod'
 
-import { cliCommand, MCP_TOKEN_KEY, ORIGIN, SPICE_SERVICE } from './config.mjs'
-import { keyringSecret, keyringStore } from './keyring.mjs'
+import { AGENT_TOKEN_SERVICE, cliCommand, MCP_TOKEN_KEY, ORIGIN } from './config.mjs'
+import { agentToken, storeAgentToken } from './keyring.mjs'
 import { awaitReturn, CliFailure, loopbackListener, openBrowser } from './loopback.mjs'
 import { restartProxy } from './systemd.mjs'
 import { UPSTREAM_TIMEOUT_MS } from './token-refresh.mjs'
 
 /**
- * `spice-agent login`: sign this machine in to spicy.trade from a browser, and keep the agent
+ * `spicy-trade login`: sign this machine in to spicy.trade from a browser, and keep the agent
  * token it is issued in the OS keyring, where the proxy reads it.
  *
  * The member approves on spicy.trade's `/connect/agent` page, already signed in there; the page
@@ -23,7 +23,7 @@ import { UPSTREAM_TIMEOUT_MS } from './token-refresh.mjs'
  * because following it is the whole point, and nothing in it grants anything on its own.
  */
 
-const PROGRAM = 'SpiceAgentLogin'
+const PROGRAM = 'SpicyTradeLogin'
 
 /**
  * 32 random bytes, as the Worker's contract (`AGENT_LOGIN_RANDOM_BYTES` in
@@ -91,7 +91,7 @@ async function exchange(code, codeVerifier, previousToken) {
 export async function login(out = process.stdout, options = { restartProxy: true }) {
   // The token this machine held before, if any, goes with the exchange so the Worker can retire
   // it: signing in again replaces this machine's token instead of adding a second one.
-  const previousToken = await keyringSecret(PROGRAM, SPICE_SERVICE, MCP_TOKEN_KEY)
+  const previousToken = await agentToken(PROGRAM)
   const state = randomBytes(RANDOM_BYTES).toString('base64url')
   const codeVerifier = randomBytes(RANDOM_BYTES).toString('base64url')
   const challenge = createHash('sha256').update(codeVerifier).digest('base64url')
@@ -118,10 +118,7 @@ export async function login(out = process.stdout, options = { restartProxy: true
   if (outcome.error) throw new CliFailure(`spicy.trade did not approve this computer (${outcome.error})`)
 
   const token = await exchange(outcome.code, codeVerifier, previousToken)
-  if (!await keyringStore(SPICE_SERVICE, MCP_TOKEN_KEY, 'spicy.trade agent token', token)
-    || await keyringSecret(PROGRAM, SPICE_SERVICE, MCP_TOKEN_KEY) !== token) {
-    throw new CliFailure(`failed to store ${SPICE_SERVICE}/${MCP_TOKEN_KEY}`)
-  }
-  out.write(`Signed in. Stored ${SPICE_SERVICE}/${MCP_TOKEN_KEY}.\n`)
+  if (!await storeAgentToken(PROGRAM, token)) throw new CliFailure(`failed to store ${AGENT_TOKEN_SERVICE}/${MCP_TOKEN_KEY}`)
+  out.write(`Signed in. Stored ${AGENT_TOKEN_SERVICE}/${MCP_TOKEN_KEY}.\n`)
   if (options.restartProxy) restartProxy(out)
 }

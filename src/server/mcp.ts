@@ -76,7 +76,7 @@ export function createSpiceMcpServer(
   // built for this caller's tier: it is paid for on every turn, and a rule about a tool they
   // were not given is a per-turn tax on a refusal they cannot reach.
   const server = new McpServer(
-    { name: 'spice', version: '1.0.0' },
+    { name: 'spicy-trade', version: '1.0.0' },
     { instructions: spiceMcpInstructions(caller.signedIn) },
   )
 
@@ -195,7 +195,7 @@ export function createSpiceMcpServer(
   // at this URI, and the guide describes the credential-free tier as well.
   server.registerResource(
     'guide',
-    'spice://guide',
+    'spicy-trade://guide',
     { description: 'What spicy.trade can answer and which tool answers it.', mimeType: 'text/markdown', title: 'spicy.trade guide' },
     (uri) => ({ contents: [{ text: SPICE_GUIDE, uri: uri.href }] }),
   )

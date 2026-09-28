@@ -5,7 +5,7 @@ import { TOKEN_REQUEST_TIMEOUT_MS } from './token-refresh.mjs'
 
 /**
  * Minting a 15-minute tastytrade access token from the long-lived grant in the keyring, for the
- * proxy that attaches it and for `spice-agent doctor` that checks the grant still mints. Its own
+ * proxy that attaches it and for `spicy-trade doctor` that checks the grant still mints. Its own
  * module because importing `proxy.mjs` starts the proxy.
  */
 
@@ -28,7 +28,7 @@ const APP_GRANT_TOKEN_URL = new URL('/api/brokers/tastytrade/token', ORIGIN)
 
 /**
  * A refused, unreachable, or unreadable token exchange. Its `code` is tastytrade's HTTP status, a
- * fixed word of ours, or `spice-` and the Worker's status when the Worker refused an app-grant
+ * fixed word of ours, or `spicy-trade-` and the Worker's status when the Worker refused an app-grant
  * mint itself, and the handler logs it beside the name: a revoked grant or an unreachable broker
  * has to read as that in the log, not as a bare `Error` or `TypeError` indistinguishable from the
  * Worker failing. `transport`, when present, is the OS- or undici-level code of the failure --
@@ -68,7 +68,7 @@ export async function mintPersonalGrant(clientSecret, refreshToken) {
       headers: {
         Accept: 'application/json',
         'Content-Type': 'application/json',
-        'User-Agent': 'Spice-Agent-Proxy/0.1',
+        'User-Agent': 'SpicyTrade-Proxy/0.1',
       },
       method: 'POST',
       signal: AbortSignal.timeout(TOKEN_REQUEST_TIMEOUT_MS),
@@ -100,19 +100,19 @@ export async function mintPersonalGrant(clientSecret, refreshToken) {
  * same authenticated channel every forwarded call uses.
  *
  * A refusal is reported by tastytrade's status when the Worker relays one, so a revoked grant
- * reads the same in this log whichever kind it is; a refusal of the Worker's own is `spice-`
+ * reads the same in this log whichever kind it is; a refusal of the Worker's own is `spicy-trade-`
  * and its status.
  */
-export async function mintAppGrant(spiceToken, refreshToken) {
+export async function mintAppGrant(agentBearer, refreshToken) {
   let response
   try {
     response = await fetch(APP_GRANT_TOKEN_URL, {
       body: JSON.stringify({ refreshToken }),
       headers: {
         Accept: 'application/json',
-        Authorization: `Bearer ${spiceToken}`,
+        Authorization: `Bearer ${agentBearer}`,
         'Content-Type': 'application/json',
-        'User-Agent': 'Spice-Agent-Proxy/0.1',
+        'User-Agent': 'SpicyTrade-Proxy/0.1',
       },
       method: 'POST',
       signal: AbortSignal.timeout(TOKEN_REQUEST_TIMEOUT_MS),
@@ -124,11 +124,11 @@ export async function mintAppGrant(spiceToken, refreshToken) {
   try {
     payload = await response.json()
   } catch {
-    throw new TastytradeAuthError(response.ok ? 'invalid-token-response' : `spice-${response.status}`)
+    throw new TastytradeAuthError(response.ok ? 'invalid-token-response' : `spicy-trade-${response.status}`)
   }
   if (!response.ok) {
     const refusal = AppGrantRefusalSchema.safeParse(payload)
-    throw new TastytradeAuthError(refusal.success ? refusal.data.tastytradeStatus : `spice-${response.status}`)
+    throw new TastytradeAuthError(refusal.success ? refusal.data.tastytradeStatus : `spicy-trade-${response.status}`)
   }
   const grant = AppGrantResponseSchema.safeParse(payload)
   if (!grant.success) throw new TastytradeAuthError('invalid-token-response')
@@ -139,8 +139,8 @@ export async function mintAppGrant(spiceToken, refreshToken) {
  * The mint for whichever grant the keyring holds (see `tastytradeCredentialKind`), or undefined
  * when it holds none that can mint alone. An ambiguous keyring is the caller's to refuse first.
  */
-export function grantMinter(spiceToken, { appRefreshToken, clientSecret, refreshToken }) {
-  if (appRefreshToken) return () => mintAppGrant(spiceToken, appRefreshToken)
+export function grantMinter(agentBearer, { appRefreshToken, clientSecret, refreshToken }) {
+  if (appRefreshToken) return () => mintAppGrant(agentBearer, appRefreshToken)
   if (clientSecret && refreshToken) return () => mintPersonalGrant(clientSecret, refreshToken)
   return undefined
 }

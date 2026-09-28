@@ -23,7 +23,7 @@ import {
 } from './tastytrade-member-grant'
 
 /*
- * The one-click tastytrade connection, driven by `ops/spice-agent/connect-tastytrade.mjs`.
+ * The one-click tastytrade connection, driven by `ops/spicy-trade/connect-tastytrade.mjs`.
  *
  *   authorize  the CLI, holding the member's agent token, opens a pending row and gets the
  *              consent URL;

@@ -20,7 +20,7 @@ import {
 import { ConfigurationError } from './secrets'
 
 /*
- * The browser sign-in for a member's terminal (`spice-agent login`); the wire contract and why it
+ * The browser sign-in for a member's terminal (`spicy-trade login`); the wire contract and why it
  * keeps the token out of every URL are in `src/domain/agent-login.ts`.
  *
  *   approve   the signed-in member, on `/connect/agent`, opens a pending row and gets a one-time

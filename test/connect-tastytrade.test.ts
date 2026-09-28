@@ -14,7 +14,7 @@ import { fakeSecretTool } from './fake-secret-tool.ts'
  * so a run never opens a browser or restarts a service on the machine running the tests.
  */
 
-const SPICE_TOKEN = 'spice_0123456789abcdef_AAAAAAAAAAAAAAAAAAAA'
+const AGENT_TOKEN = 'spice_0123456789abcdef_AAAAAAAAAAAAAAAAAAAA'
 const STATE = 'S'.repeat(43)
 const CODE = 'authorization-code-from-tastytrade'
 const REFRESH_TOKEN = 'app-refresh-token-that-belongs-in-the-keyring'
@@ -83,8 +83,8 @@ async function fakeWorker(exchangeAnswer: () => { body: unknown; status: number 
 function startCli(tools: string, workerPort: number) {
   let stdout = ''
   let stderr = ''
-  cli = spawn(process.execPath, ['ops/spice-agent/connect-tastytrade.mjs'], {
-    env: { ...process.env, SPICE_MCP_URL: `http://127.0.0.1:${workerPort}/mcp`, PATH: `${tools}:${process.env.PATH ?? ''}` },
+  cli = spawn(process.execPath, ['ops/spicy-trade/connect-tastytrade.mjs'], {
+    env: { ...process.env, SPICY_TRADE_MCP_URL: `http://127.0.0.1:${workerPort}/mcp`, PATH: `${tools}:${process.env.PATH ?? ''}` },
     stdio: ['ignore', 'pipe', 'pipe'],
   })
   cli.stdout?.on('data', (chunk: Buffer) => { stdout += chunk.toString() })
@@ -116,7 +116,7 @@ async function loopbackPort(calls: WorkerCall[], output: () => { stdout: string 
 
 describe('connect-tastytrade', () => {
   it('redeems the return through the Worker and stores the refresh token in the keyring only', async () => {
-    const tools = await fakeTools({ 'spice/mcp-token': SPICE_TOKEN })
+    const tools = await fakeTools({ 'spicy-trade/mcp-token': AGENT_TOKEN })
     const { calls, port } = await fakeWorker(() => ({ body: { refreshToken: REFRESH_TOKEN }, status: 200 }))
     const run = startCli(tools, port)
     const listener = await loopbackPort(calls, run.output)
@@ -135,10 +135,10 @@ describe('connect-tastytrade', () => {
       '/api/brokers/tastytrade/authorize',
       '/api/brokers/tastytrade/exchange',
     ])
-    for (const call of calls) expect(call.headers.authorization).toBe(`Bearer ${SPICE_TOKEN}`)
+    for (const call of calls) expect(call.headers.authorization).toBe(`Bearer ${AGENT_TOKEN}`)
     expect(calls[1]?.body).toEqual({ code: CODE, state: STATE })
     const { stderr, stdout } = run.output()
-    for (const secret of [REFRESH_TOKEN, CODE, SPICE_TOKEN]) {
+    for (const secret of [REFRESH_TOKEN, CODE, AGENT_TOKEN]) {
       expect(stdout).not.toContain(secret)
       expect(stderr).not.toContain(secret)
     }
@@ -149,7 +149,7 @@ describe('connect-tastytrade', () => {
   }, 30_000)
 
   it('reports a refusal by its OAuth code and stores nothing', async () => {
-    const tools = await fakeTools({ 'spice/mcp-token': SPICE_TOKEN })
+    const tools = await fakeTools({ 'spicy-trade/mcp-token': AGENT_TOKEN })
     const { calls, port } = await fakeWorker(() => ({ body: { refreshToken: REFRESH_TOKEN }, status: 200 }))
     const run = startCli(tools, port)
     const listener = await loopbackPort(calls, run.output)
@@ -161,7 +161,7 @@ describe('connect-tastytrade', () => {
   }, 30_000)
 
   it('reports a tastytrade refusal of the code by status, never a body', async () => {
-    const tools = await fakeTools({ 'spice/mcp-token': SPICE_TOKEN })
+    const tools = await fakeTools({ 'spicy-trade/mcp-token': AGENT_TOKEN })
     const { calls, port } = await fakeWorker(() => ({
       body: { error: 'tastytrade refused the grant', tastytradeStatus: 400 },
       status: 502,
@@ -176,7 +176,7 @@ describe('connect-tastytrade', () => {
 
   it('refuses to start over a personal grant, before reaching the Worker', async () => {
     const tools = await fakeTools({
-      'spice/mcp-token': SPICE_TOKEN,
+      'spicy-trade/mcp-token': AGENT_TOKEN,
       'tastytrade/client-secret': 'personal-client-secret',
     })
     const { calls, port } = await fakeWorker(() => ({ body: {}, status: 500 }))

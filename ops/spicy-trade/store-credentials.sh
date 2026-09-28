@@ -7,8 +7,14 @@
 # readable by any tool the agent can run, and a tastytrade refresh token never expires.
 set -euo pipefail
 
-mcp_url=${SPICE_MCP_URL:-https://spicy.trade/mcp}
-agent_cli="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/spice-agent.mjs"
+# SPICE_MCP_URL is the pre-rename name, still read so an old environment keeps working.
+mcp_url=${SPICY_TRADE_MCP_URL:-${SPICE_MCP_URL:-https://spicy.trade/mcp}}
+agent_cli="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/spicy-trade.mjs"
+# The agent token's keyring service, and the one an install from before the rename used (see
+# config.mjs); the proxy prefers the current one, so a token stored here replaces the old entry.
+token_service=spicy-trade
+legacy_token_service=spice
+unit=spicy-trade-proxy.service
 
 usage() {
   cat <<'EOF'
@@ -16,7 +22,7 @@ Usage: store-credentials.sh [mcp-token|tastytrade]
 
 The easy path is one command, which signs in from the browser with nothing to paste:
 
-  spice-agent setup     (from a checkout: ./ops/spice-agent/spice-agent.mjs setup)
+  spicy-trade setup     (from a checkout: ./ops/spicy-trade/spicy-trade.mjs setup)
 
 This script is for pasting a credential by hand instead:
 
@@ -60,18 +66,21 @@ check_mcp_token() {
     return
   fi
   local status
-  status=$(printf 'header = "Authorization: Bearer %s"\n' "$(secret-tool lookup service spice key mcp-token)" \
+  status=$(printf 'header = "Authorization: Bearer %s"\n' "$(secret-tool lookup service "${token_service}" key mcp-token)" \
     | curl --silent --output /dev/null --write-out '%{http_code}' --max-time 60 --config - \
       --header 'Accept: application/json, text/event-stream' --header 'Content-Type: application/json' \
       --data '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}' "${mcp_url}" || true)
   case "${status}" in
     401)
-      secret-tool clear service spice key mcp-token
+      secret-tool clear service "${token_service}" key mcp-token
       echo '  spicy.trade rejected that token, so it was not kept. Sign in from the browser instead:' >&2
       echo "    ${agent_cli} login" >&2
       exit 1
       ;;
-    2??) echo '  spicy.trade accepted the token' ;;
+    2??)
+      echo '  spicy.trade accepted the token'
+      secret-tool clear service "${legacy_token_service}" key mcp-token
+      ;;
     *)
       echo "  spicy.trade could not check the token (${status:-no answer}); it is stored unchecked. Check later with:" >&2
       echo "    ${agent_cli} doctor" >&2
@@ -92,7 +101,7 @@ case "${1:-mcp-token}" in
 esac
 
 if [[ ${want_mcp} -eq 1 ]]; then
-  store spice mcp-token 'spicy.trade agent token' 'spicy.trade agent token (Connect tab in the web app):'
+  store "${token_service}" mcp-token 'spicy.trade agent token' 'spicy.trade agent token (Connect tab in the web app):'
   check_mcp_token
   if ! secret-tool lookup service tastytrade key app-refresh-token >/dev/null 2>&1 \
     && ! secret-tool lookup service tastytrade key refresh-token >/dev/null 2>&1; then
@@ -108,10 +117,10 @@ if [[ ${want_tasty} -eq 1 ]]; then
 fi
 
 # The proxy reads the keyring once at startup, so it has to be restarted to see a new value.
-if systemctl --user is-enabled spice-agent-proxy.service >/dev/null 2>&1; then
-  systemctl --user restart spice-agent-proxy.service
+if systemctl --user is-enabled "${unit}" >/dev/null 2>&1; then
+  systemctl --user restart "${unit}"
   echo
-  systemctl --user is-active spice-agent-proxy.service >/dev/null \
+  systemctl --user is-active "${unit}" >/dev/null \
     && echo 'Proxy restarted. Check everything with:' \
     || echo 'Proxy failed to restart. Find out why with:'
   echo "  ${agent_cli} doctor"

@@ -513,10 +513,10 @@ describe('the guide resource', () => {
       }, token), env, executionContext)
       const resources = z.object({ result: z.object({ resources: z.array(z.object({ uri: z.string() })) }) })
         .parse(await mcpPayload(listed))
-      expect(resources.result.resources.map((entry) => entry.uri)).toContain('spice://guide')
+      expect(resources.result.resources.map((entry) => entry.uri)).toContain('spicy-trade://guide')
 
       const read = await handleMcpRequest(mcpRequest({
-        id: 21, jsonrpc: '2.0', method: 'resources/read', params: { uri: 'spice://guide' },
+        id: 21, jsonrpc: '2.0', method: 'resources/read', params: { uri: 'spicy-trade://guide' },
       }, token), env, executionContext)
       const contents = z.object({ result: z.object({ contents: z.array(z.object({ text: z.string() })) }) })
         .parse(await mcpPayload(read))
@@ -552,10 +552,10 @@ describe('the guide resource', () => {
       }), env, executionContext)
       const resources = z.object({ result: z.object({ resources: z.array(z.object({ uri: z.string() })) }) })
         .parse(await mcpPayload(listed))
-      expect(resources.result.resources.map((entry) => entry.uri)).toContain('spice://guide')
+      expect(resources.result.resources.map((entry) => entry.uri)).toContain('spicy-trade://guide')
 
       const read = await handleMcpRequest(mcpRequest({
-        id: 31, jsonrpc: '2.0', method: 'resources/read', params: { uri: 'spice://guide' },
+        id: 31, jsonrpc: '2.0', method: 'resources/read', params: { uri: 'spicy-trade://guide' },
       }), env, executionContext)
       const contents = z.object({ result: z.object({ contents: z.array(z.object({ text: z.string() })) }) })
         .parse(await mcpPayload(read))

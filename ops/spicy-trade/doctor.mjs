@@ -1,19 +1,20 @@
 import { z } from 'zod'
 
 import { grantMinter, TastytradeAuthError } from './broker-grants.mjs'
-import { CLIENTS } from './clients.mjs'
+import { CLIENTS, namesSpicyTrade } from './clients.mjs'
 import {
-  cliCommand, MCP_SERVER_NAME, MCP_TOKEN_KEY, ORIGIN, PROXY_URL, SPICE_SERVICE, storeCredentialsCommand, UNIT_NAME,
+  AGENT_TOKEN_SERVICE, cliCommand, LEGACY_AGENT_TOKEN_SERVICE, LEGACY_MCP_SERVER_NAME, LEGACY_UNIT_NAME, MCP_SERVER_NAME,
+  MCP_TOKEN_KEY, ORIGIN, PROXY_URL, storeCredentialsCommand, UNIT_NAME,
 } from './config.mjs'
 import {
-  APP_REFRESH_TOKEN_KEY, keyringSecret, secretToolInstalled, TASTYTRADE, tastytradeCredentialKind,
+  agentToken, APP_REFRESH_TOKEN_KEY, keyringSecret, secretToolInstalled, TASTYTRADE, tastytradeCredentialKind,
 } from './keyring.mjs'
-import { unitState } from './systemd.mjs'
+import { legacyUnitInstalled, unitState } from './systemd.mjs'
 import { TOKEN_REQUEST_TIMEOUT_MS, UPSTREAM_TIMEOUT_MS } from './token-refresh.mjs'
 import { checkAgentToken, describeTokenCheck } from './worker.mjs'
 
 /**
- * `spice-agent doctor`: every link between an agent and spicy.trade, checked in the order a
+ * `spicy-trade doctor`: every link between an agent and spicy.trade, checked in the order a
  * request crosses them, each failure with the one command that fixes it.
  *
  * Output is fixed vocabulary, as everywhere in these tools: a status, a transport code, a path of
@@ -21,7 +22,7 @@ import { checkAgentToken, describeTokenCheck } from './worker.mjs'
  * printed, and the proxy's answer is read only for its JSON-RPC error message.
  */
 
-const PROGRAM = 'SpiceAgentDoctor'
+const PROGRAM = 'SpicyTradeDoctor'
 
 /**
  * The proxy's worst case for one call that also mints a broker token: a mint's budget, then the
@@ -49,7 +50,7 @@ function report(out) {
 
 function brokerFailure(error, kind) {
   if (!(error instanceof TastytradeAuthError)) return 'the grant could not be minted'
-  if (error.code === 'spice-401') return 'spicy.trade rejected the agent token while minting'
+  if (error.code === 'spicy-trade-401') return 'spicy.trade rejected the agent token while minting'
   if (error.code === 'unreachable') return `${error.party} could not be reached${error.transport ? ` (${error.transport})` : ''}`
   if (Number.isInteger(error.code)) return `tastytrade refused the ${kind === 'app' ? 'connection' : 'personal grant'} (HTTP ${error.code})`
   return `the mint failed (${String(error.code)})`
@@ -63,7 +64,7 @@ async function checkProxy() {
         id: 1,
         jsonrpc: '2.0',
         method: 'initialize',
-        params: { capabilities: {}, clientInfo: { name: 'spice-agent-doctor', version: '1' }, protocolVersion: MCP_PROTOCOL_VERSION },
+        params: { capabilities: {}, clientInfo: { name: 'spicy-trade-doctor', version: '1' }, protocolVersion: MCP_PROTOCOL_VERSION },
       }),
       headers: { Accept: 'application/json, text/event-stream', 'Content-Type': 'application/json' },
       method: 'POST',
@@ -96,14 +97,18 @@ export async function doctor(out = process.stdout) {
   }
   checks.pass('secret-tool is installed')
 
-  const token = await keyringSecret(PROGRAM, SPICE_SERVICE, MCP_TOKEN_KEY)
+  const token = await agentToken(PROGRAM)
   if (!token) {
-    checks.fail(`no agent token in the keyring (${SPICE_SERVICE}/${MCP_TOKEN_KEY})`, `Sign in with: ${cliCommand('login')}`)
+    checks.fail(`no agent token in the keyring (${AGENT_TOKEN_SERVICE}/${MCP_TOKEN_KEY})`, `Sign in with: ${cliCommand('login')}`)
   } else {
     const check = await checkAgentToken(token)
     if (check.status === 'accepted') checks.pass(describeTokenCheck(check))
     else if (check.status === 'rejected') checks.fail(describeTokenCheck(check), `Sign in again with: ${cliCommand('login')}`)
     else checks.fail(describeTokenCheck(check), `Check the network and ${ORIGIN}, then run this again.`)
+    if (await keyringSecret(PROGRAM, AGENT_TOKEN_SERVICE, MCP_TOKEN_KEY) !== token) {
+      checks.fail(`the agent token is still under its old keyring entry (${LEGACY_AGENT_TOKEN_SERVICE}/${MCP_TOKEN_KEY})`,
+        `Move it with: ${setup}`)
+    }
   }
 
   const credential = await tastytradeCredentialKind(PROGRAM)
@@ -123,7 +128,7 @@ export async function doctor(out = process.stdout) {
     } catch (error) {
       // A refused agent token fails the app-grant mint too; signing in again fixes both.
       checks.fail(`${described}: ${brokerFailure(error, credential.kind)}`,
-        error instanceof TastytradeAuthError && error.code === 'spice-401'
+        error instanceof TastytradeAuthError && error.code === 'spicy-trade-401'
           ? `Sign in again with: ${cliCommand('login')}`
           : credential.kind === 'app'
             ? `Reconnect with: ${cliCommand('connect-tastytrade')}`
@@ -131,6 +136,9 @@ export async function doctor(out = process.stdout) {
     }
   }
 
+  if (await legacyUnitInstalled()) {
+    checks.fail(`the old ${LEGACY_UNIT_NAME} is still installed`, `Replace it with: ${setup}`)
+  }
   const unit = await unitState()
   if (unit.installed === undefined) {
     checks.fail('the proxy service is not installed', `Install it with: ${setup}`)
@@ -157,9 +165,13 @@ export async function doctor(out = process.stdout) {
     } else if (configured.url !== PROXY_URL) {
       // The configured address is not printed: a client entry may carry a credential in its URL.
       checks.fail(`${client.name} points ${MCP_SERVER_NAME} somewhere other than the proxy`,
-        `Replace it: ${client.removeCommand} && ${client.addCommand}`)
+        `Replace it: ${client.removeCommand()} && ${client.addCommand}`)
     } else {
       checks.pass(`${client.name} points at the proxy`)
+    }
+    const legacy = client.configured(LEGACY_MCP_SERVER_NAME)
+    if (legacy.state === 'configured' && namesSpicyTrade(legacy.url)) {
+      checks.fail(`${client.name} still has the old ${LEGACY_MCP_SERVER_NAME} entry`, `Replace it with: ${setup}`)
     }
   }
 

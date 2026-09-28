@@ -31,16 +31,16 @@ describe('Connect screen copy', () => {
   it('gives a proxy add command with no Authorization header, for the default client', () => {
     const html = renderToStaticMarkup(createElement(ConnectScreen, { owner: false }))
     // One command is the proxy path; it is also the repair, and doctor says which step to repair.
-    expect(html).toContain('./ops/spice-agent/spice-agent.mjs setup')
-    expect(html).toContain('./ops/spice-agent/spice-agent.mjs doctor')
+    expect(html).toContain('./ops/spicy-trade/spicy-trade.mjs setup')
+    expect(html).toContain('./ops/spicy-trade/spicy-trade.mjs doctor')
     // The manual steps stay documented beneath it, for a machine the command does not fit.
-    expect(html).toContain('claude mcp add --transport http spice http://127.0.0.1:8787/mcp')
-    expect(html).toContain('./ops/spice-agent/store-credentials.sh mcp-token')
-    expect(html).toContain('./ops/spice-agent/store-credentials.sh tastytrade')
+    expect(html).toContain('claude mcp add --transport http spicy-trade http://127.0.0.1:8787/mcp')
+    expect(html).toContain('./ops/spicy-trade/store-credentials.sh mcp-token')
+    expect(html).toContain('./ops/spicy-trade/store-credentials.sh tastytrade')
     // spicy.trade's tastytrade app is the usual way; a personal grant stays documented beside it.
-    expect(html).toContain('./ops/spice-agent/connect-tastytrade.mjs')
+    expect(html).toContain('./ops/spicy-trade/connect-tastytrade.mjs')
     // OAuth to the public URL remains for clients that can complete a browser sign-in.
-    expect(html).toContain('claude mcp add --transport http spice https://spicy.trade/mcp')
+    expect(html).toContain('claude mcp add --transport http spicy-trade https://spicy.trade/mcp')
     // A header-less request is served at the public tier, never challenged, so adding the
     // server must not be described as what opens the browser.
     expect(html).toContain('connects straight away at the public tier')
@@ -57,12 +57,12 @@ describe('Connect screen copy', () => {
     const { container } = renderInteractive()
     fireEvent.click(screen.getByRole('radio', { name: 'Grok' }))
     const text = container.textContent ?? ''
-    expect(text).toContain('grok mcp add --transport http spice http://127.0.0.1:8787/mcp')
-    expect(text).toContain('grok mcp add --transport http spice https://spicy.trade/mcp')
+    expect(text).toContain('grok mcp add --transport http spicy-trade http://127.0.0.1:8787/mcp')
+    expect(text).toContain('grok mcp add --transport http spicy-trade https://spicy.trade/mcp')
     expect(text).toContain('Grok lists tools, not prompts')
     expect(text).not.toContain('codex mcp add')
     // The headless header flag is Claude Code's alone, so its block stays whatever is picked.
-    expect(text).toContain('claude mcp add --transport http spice https://spicy.trade/mcp --header')
+    expect(text).toContain('claude mcp add --transport http spicy-trade https://spicy.trade/mcp --header')
     expect(storage.get('spice.connect-client.v1')).toBe('grok')
 
     cleanup()
@@ -77,8 +77,8 @@ describe('Connect screen copy', () => {
     fireEvent.click(screen.getByRole('radio', { name: 'Other' }))
     const text = container.textContent ?? ''
     expect(text).toContain('Streamable HTTP server')
-    expect(text).toContain('muse mcp login spice')
+    expect(text).toContain('muse mcp login spicy-trade')
     expect(text).not.toMatch(/(grok|codex) mcp add/)
-    expect(text).not.toContain('claude mcp add --transport http spice http://127.0.0.1:8787/mcp')
+    expect(text).not.toContain('claude mcp add --transport http spicy-trade http://127.0.0.1:8787/mcp')
   })
 })

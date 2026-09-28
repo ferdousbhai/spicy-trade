@@ -6,11 +6,11 @@ import { setup } from './setup.mjs'
 import { connectTastytrade } from './tastytrade-connect.mjs'
 
 /**
- * `spice-agent`: the one command a member runs on their own machine. `setup` is the whole path
+ * `spicy-trade`: the one command a member runs on their own machine. `setup` is the whole path
  * from nothing to a working agent; the others are its steps, for when only one needs redoing.
  */
 
-const USAGE = `Usage: spice-agent <command>
+const USAGE = `Usage: spicy-trade <command>
 
   setup               Sign in, install the local proxy, optionally connect tastytrade, and
                       point Claude Code and Codex at the proxy. Safe to run again: it skips
@@ -38,7 +38,7 @@ if (command === undefined || command === '-h' || command === '--help' || command
     await COMMANDS[command]()
   } catch (error) {
     if (!(error instanceof CliFailure)) throw error
-    process.stderr.write(`spice-agent ${command}: ${error.message}\n`)
+    process.stderr.write(`spicy-trade ${command}: ${error.message}\n`)
     process.exitCode = 1
   }
 }

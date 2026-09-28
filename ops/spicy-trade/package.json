@@ -5,13 +5,13 @@
   "license": "MIT",
   "type": "module",
   "bin": {
-    "spice-agent": "spice-agent.mjs"
+    "spicy-trade": "spicy-trade.mjs"
   },
   "files": [
     "*.mjs",
     "*.d.mts",
     "store-credentials.sh",
-    "systemd/spice-agent-proxy.service"
+    "systemd/spicy-trade-proxy.service"
   ],
   "engines": {
     "node": ">=22"

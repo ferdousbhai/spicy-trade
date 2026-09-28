@@ -1,9 +1,9 @@
 import { spawnSync } from 'node:child_process'
-import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 
-import { cliCommand, PROXY_PATH, UNIT_NAME } from './config.mjs'
+import { cliCommand, LEGACY_UNIT_NAME, PROXY_PATH, UNIT_NAME } from './config.mjs'
 import { CliFailure } from './loopback.mjs'
 
 /**
@@ -13,10 +13,29 @@ import { CliFailure } from './loopback.mjs'
  * notice a unit left pointing at a checkout or a node version that has since moved.
  */
 
-const TEMPLATE_URL = new URL('./systemd/spice-agent-proxy.service', import.meta.url)
+const TEMPLATE_URL = new URL('./systemd/spicy-trade-proxy.service', import.meta.url)
 
-export function unitPath() {
-  return join(process.env.XDG_CONFIG_HOME || join(homedir(), '.config'), 'systemd', 'user', UNIT_NAME)
+export function unitPath(name = UNIT_NAME) {
+  return join(process.env.XDG_CONFIG_HOME || join(homedir(), '.config'), 'systemd', 'user', name)
+}
+
+/** Whether the unit an install from before the rename used is still on this machine. */
+export async function legacyUnitInstalled() {
+  return await readFile(unitPath(LEGACY_UNIT_NAME), 'utf8').then(() => true, () => false)
+}
+
+/**
+ * Stop, disable and delete the pre-rename unit. It runs a proxy on the same port, so it has to be
+ * gone before the current unit can start. True when there was one to remove.
+ */
+export async function removeLegacyUnit() {
+  if (!await legacyUnitInstalled()) return false
+  // Either may fail on a unit systemd has already forgotten; the file going is what matters.
+  systemctl('stop', LEGACY_UNIT_NAME)
+  systemctl('disable', LEGACY_UNIT_NAME)
+  await rm(unitPath(LEGACY_UNIT_NAME))
+  if (!systemctl('daemon-reload')) throw new CliFailure('systemctl --user daemon-reload failed')
+  return true
 }
 
 /**

@@ -1,17 +1,22 @@
 import { createInterface } from 'node:readline/promises'
 
-import { CLIENTS } from './clients.mjs'
-import { cliCommand, MCP_SERVER_NAME, MCP_TOKEN_KEY, PROXY_URL, SPICE_SERVICE } from './config.mjs'
+import { CLIENTS, namesSpicyTrade } from './clients.mjs'
+import {
+  AGENT_TOKEN_SERVICE, cliCommand, LEGACY_AGENT_TOKEN_SERVICE, LEGACY_MCP_SERVER_NAME, LEGACY_UNIT_NAME, MCP_SERVER_NAME,
+  MCP_TOKEN_KEY, PROXY_URL,
+} from './config.mjs'
 import { doctor } from './doctor.mjs'
-import { keyringSecret, secretToolInstalled, tastytradeCredentialKind } from './keyring.mjs'
+import {
+  agentToken, keyringClear, keyringSecret, secretToolInstalled, storeAgentToken, tastytradeCredentialKind,
+} from './keyring.mjs'
 import { login } from './login.mjs'
 import { CliFailure } from './loopback.mjs'
-import { installUnit, restartProxy, systemctl } from './systemd.mjs'
+import { installUnit, removeLegacyUnit, restartProxy, systemctl } from './systemd.mjs'
 import { connectTastytrade } from './tastytrade-connect.mjs'
 import { checkAgentToken, describeTokenCheck } from './worker.mjs'
 
 /**
- * `spice-agent setup`: everything between a fresh machine and an agent that can reach
+ * `spicy-trade setup`: everything between a fresh machine and an agent that can reach
  * spicy.trade, in one run. Each step looks before it acts and skips what is already done, so
  * running it again is also how a broken setup is repaired; `doctor` closes the run by checking
  * the result end to end.
@@ -21,7 +26,7 @@ import { checkAgentToken, describeTokenCheck } from './worker.mjs'
  * ask on leaves it undone and says how to do it later.
  */
 
-const PROGRAM = 'SpiceAgentSetup'
+const PROGRAM = 'SpicyTradeSetup'
 
 function step(out, title) {
   out.write(`\n== ${title}\n`)
@@ -33,6 +38,26 @@ async function confirm(question) {
     return /^y(es)?$/i.test((await prompt.question(question)).trim())
   } finally {
     prompt.close()
+  }
+}
+
+/**
+ * The entry an install from before the rename added, under the old name. It is removed only once
+ * the current entry is in place, so a client is never left with neither, and only when it names
+ * the proxy or spicy.trade: an entry of that name pointing anywhere else is someone's own.
+ */
+function replaceLegacyEntry(out, client, inPlace) {
+  const legacy = client.configured(LEGACY_MCP_SERVER_NAME)
+  if (legacy.state !== 'configured') return
+  if (!namesSpicyTrade(legacy.url)) {
+    out.write(`! ${client.name} has a ${LEGACY_MCP_SERVER_NAME} server that is not spicy.trade's; left as it is\n`)
+  } else if (!inPlace) {
+    out.write(`· ${client.name} keeps its old ${LEGACY_MCP_SERVER_NAME} entry until ${MCP_SERVER_NAME} is in place\n`)
+  } else if (client.remove(LEGACY_MCP_SERVER_NAME).ok) {
+    out.write(`✓ ${client.name}: removed the old ${LEGACY_MCP_SERVER_NAME} entry; the server is ${MCP_SERVER_NAME} now\n`)
+  } else {
+    out.write(`✗ ${client.name} did not remove the old ${LEGACY_MCP_SERVER_NAME} entry; remove it yourself with:\n`
+      + `    ${client.removeCommand(LEGACY_MCP_SERVER_NAME)}\n`)
   }
 }
 
@@ -52,10 +77,19 @@ export async function setup(out = process.stdout) {
   let credentialsChanged = false
 
   step(out, 'spicy.trade sign-in')
-  const token = await keyringSecret(PROGRAM, SPICE_SERVICE, MCP_TOKEN_KEY)
+  const token = await agentToken(PROGRAM)
   const check = token ? await checkAgentToken(token) : undefined
   if (check?.status === 'accepted') {
-    out.write('✓ already signed in; skipped\n')
+    if (await keyringSecret(PROGRAM, AGENT_TOKEN_SERVICE, MCP_TOKEN_KEY) === token) {
+      await keyringClear(LEGACY_AGENT_TOKEN_SERVICE, MCP_TOKEN_KEY)
+      out.write('✓ already signed in; skipped\n')
+    } else {
+      // Signed in before the rename: the token is good, only its keyring entry is old.
+      if (!await storeAgentToken(PROGRAM, token)) {
+        throw new CliFailure(`failed to move the agent token to ${AGENT_TOKEN_SERVICE}/${MCP_TOKEN_KEY}`)
+      }
+      out.write(`✓ already signed in; moved the token from ${LEGACY_AGENT_TOKEN_SERVICE}/${MCP_TOKEN_KEY} to ${AGENT_TOKEN_SERVICE}/${MCP_TOKEN_KEY}\n`)
+    }
   } else if (check?.status === 'unanswered' || check?.status === 'unreachable') {
     throw new CliFailure(`${describeTokenCheck(check)}. Run this again once spicy.trade answers.`)
   } else {
@@ -65,6 +99,7 @@ export async function setup(out = process.stdout) {
   }
 
   step(out, 'proxy service')
+  if (await removeLegacyUnit()) out.write(`✓ removed the old ${LEGACY_UNIT_NAME}\n`)
   const installed = await installUnit()
   if (installed === 'unchanged') {
     out.write('✓ already installed and running; skipped\n')
@@ -98,19 +133,23 @@ export async function setup(out = process.stdout) {
     const configured = client.configured()
     if (configured.state === 'uninstalled') continue
     clientsFound += 1
+    let inPlace = false
     if (configured.state === 'failed') {
       out.write(`✗ ${client.name} did not answer; add it yourself with:\n    ${client.addCommand}\n`)
     } else if (configured.state === 'configured' && configured.url === PROXY_URL) {
       out.write(`✓ ${client.name} already points at the proxy; skipped\n`)
+      inPlace = true
     } else if (configured.state === 'configured') {
       // Someone chose that entry; replacing it is theirs to decide.
       out.write(`! ${client.name} already has a ${MCP_SERVER_NAME} server pointing elsewhere; left as it is. To replace it:\n`
-        + `    ${client.removeCommand} && ${client.addCommand}\n`)
+        + `    ${client.removeCommand()} && ${client.addCommand}\n`)
     } else if (client.add().ok) {
       out.write(`✓ ${client.name}: added ${MCP_SERVER_NAME} at ${PROXY_URL}\n`)
+      inPlace = true
     } else {
       out.write(`✗ ${client.name} refused to add the server; add it yourself with:\n    ${client.addCommand}\n`)
     }
+    replaceLegacyEntry(out, client, inPlace)
   }
   if (!clientsFound) {
     out.write(`· no Claude Code or Codex found. Point any MCP client at ${PROXY_URL} (streamable HTTP, no credentials).\n`)

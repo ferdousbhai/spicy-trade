@@ -16,20 +16,22 @@ import { CopyBlock } from './copy-block'
 import { MCP_ENDPOINT } from '../domain/site'
 
 const PROXY_URL = 'http://127.0.0.1:8787/mcp'
+/** The name every client's config knows the server by; `spicy-trade setup` adds it under this too. */
+const MCP_SERVER_NAME = 'spicy-trade'
 const addCommands = (url: string) => ({
-  claude: `claude mcp add --transport http spice ${url}`,
-  codex: `codex mcp add spice --url ${url}`,
-  grok: `grok mcp add --transport http spice ${url}`,
+  claude: `claude mcp add --transport http ${MCP_SERVER_NAME} ${url}`,
+  codex: `codex mcp add ${MCP_SERVER_NAME} --url ${url}`,
+  grok: `grok mcp add --transport http ${MCP_SERVER_NAME} ${url}`,
   other: undefined,
 }) satisfies Record<AgentClient, string | undefined>
 /**
  * The one command for the proxy path: it runs the browser sign-in, the keyring, the service, the
  * brokerage and the agent's config in order, and is also the repair when any of them is missing.
  */
-const SETUP_COMMAND = './ops/spice-agent/spice-agent.mjs setup'
-const DOCTOR_COMMAND = './ops/spice-agent/spice-agent.mjs doctor'
+const SETUP_COMMAND = './ops/spicy-trade/spicy-trade.mjs setup'
+const DOCTOR_COMMAND = './ops/spicy-trade/spicy-trade.mjs doctor'
 /** Reads the spicy.trade token from the keyring, so it needs the token stored first. */
-const CONNECT_TASTYTRADE_COMMAND = './ops/spice-agent/connect-tastytrade.mjs'
+const CONNECT_TASTYTRADE_COMMAND = './ops/spicy-trade/connect-tastytrade.mjs'
 
 /**
  * The clients the page has exact commands for, and "Other" for everything that speaks
@@ -215,7 +217,7 @@ export function ConnectScreen({ owner }: { owner: boolean }) {
   // reveal the placeholder is all that can honestly be shown: the digest is all the server kept.
   const bearer = issued?.token ?? 'YOUR_TOKEN'
   const mcpConfig = JSON.stringify({
-    mcpServers: { spice: { headers: { Authorization: `Bearer ${bearer}` }, type: 'http', url: MCP_ENDPOINT } },
+    mcpServers: { [MCP_SERVER_NAME]: { headers: { Authorization: `Bearer ${bearer}` }, type: 'http', url: MCP_ENDPOINT } },
   }, null, 2)
   const headlessCommand = `${addCommands(MCP_ENDPOINT).claude} --header "Authorization: Bearer ${bearer}"`
   // No header. Claude Code skips the OAuth flow entirely when a static `Authorization` is
@@ -276,7 +278,7 @@ export function ConnectScreen({ owner }: { owner: boolean }) {
               <>
                 <CopyBlock label="Streamable HTTP server" value={MCP_ENDPOINT} />
                 <p className="connect-note">
-                  Muse: add a streamable-HTTP <code>spice</code> entry under <code>mcpServers</code> in its
+                  Muse: add a streamable-HTTP <code>{MCP_SERVER_NAME}</code> entry under <code>mcpServers</code> in its
                   <code> settings.json</code>. Pi has no built-in MCP client; add one with an extension
                   (<code>pi install</code>).
                 </p>
@@ -288,8 +290,8 @@ export function ConnectScreen({ owner }: { owner: boolean }) {
           client that supports it opens a browser to sign you in with Google and renews its own
           access — you should not need to come back here.
           {client === 'claude' && <> In Claude Code that is <code>/mcp</code>.</>}
-          {client === 'codex' && <> In Codex that is <code>codex mcp login spice</code>.</>}
-          {client === 'other' && <> In Muse that is <code>muse mcp login spice</code>.</>}
+          {client === 'codex' && <> In Codex that is <code>codex mcp login {MCP_SERVER_NAME}</code>.</>}
+          {client === 'other' && <> In Muse that is <code>muse mcp login {MCP_SERVER_NAME}</code>.</>}
         </p>
         <p className="connect-note">
           If your client cannot sign in this way, use the local proxy below. If you already run the
@@ -320,7 +322,7 @@ export function ConnectScreen({ owner }: { owner: boolean }) {
           <summary>Manual setup</summary>
           <CopyBlock
             label="Store your spicy.trade token"
-            value={'./ops/spice-agent/store-credentials.sh mcp-token'}
+            value={'./ops/spicy-trade/store-credentials.sh mcp-token'}
           />
           <p>Issue the token in step 3, paste it at the prompt. The script restarts the proxy.</p>
           {proxyCommand
@@ -343,7 +345,7 @@ export function ConnectScreen({ owner }: { owner: boolean }) {
           </p>
           <CopyBlock
             label="Store a personal grant"
-            value={'./ops/spice-agent/store-credentials.sh tastytrade'}
+            value={'./ops/spicy-trade/store-credentials.sh tastytrade'}
           />
         </details>
       </details>

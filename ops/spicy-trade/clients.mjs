@@ -2,14 +2,14 @@ import { spawnSync } from 'node:child_process'
 import { homedir } from 'node:os'
 import { z } from 'zod'
 
-import { MCP_SERVER_NAME, PROXY_URL } from './config.mjs'
+import { MCP_SERVER_NAME, ORIGIN, PROXY_URL } from './config.mjs'
 
 /**
  * The agent clients `setup` can point at the proxy, through each client's own CLI rather than by
  * editing its config file, whose format is the client's to change.
  *
  * Every client is added at user scope, so the proxy is there in any directory. The commands run
- * from the home directory: a project's own `.mcp.json` would otherwise answer for `spice` in
+ * from the home directory: a project's own `.mcp.json` would otherwise answer for the server's name in
  * whatever directory `setup` happened to be run from.
  *
  * Nothing here carries a credential: the proxy URL is the whole configuration, which is the point
@@ -39,7 +39,7 @@ function run(command, args) {
 }
 
 /**
- * What a client has for `spice`: `uninstalled` (no such CLI), `failed` (the CLI did not answer),
+ * What a client has under one entry name: `uninstalled` (no such CLI), `failed` (the CLI did not answer),
  * `missing`, or `configured` with the URL it names -- empty when the entry is not a URL at all.
  */
 function lookup(got, urlOf) {
@@ -49,28 +49,41 @@ function lookup(got, urlOf) {
   return { state: 'configured', url: urlOf(got.stdout) }
 }
 
+/** Whether an entry's URL is this proxy or spicy.trade itself, so the entry is ours to replace. */
+export function namesSpicyTrade(url) {
+  return url === PROXY_URL || url.startsWith(`${ORIGIN}/`)
+}
+
+/**
+ * Each client, with its lookup and removal taking the entry name: `setup` asks about both the
+ * current name and the one an install from before the rename added (see `config.mjs`), and
+ * replaces the old entry once the current one is in place. Only the current name is ever added.
+ */
 export const CLIENTS = [
   {
     add: () => run('claude', ['mcp', 'add', '--scope', 'user', '--transport', 'http', MCP_SERVER_NAME, PROXY_URL]),
     addCommand: `claude mcp add --scope user --transport http ${MCP_SERVER_NAME} ${PROXY_URL}`,
     name: 'Claude Code',
-    configured: () => lookup(
-      run('claude', ['mcp', 'get', MCP_SERVER_NAME]),
+    configured: (entry = MCP_SERVER_NAME) => lookup(
+      run('claude', ['mcp', 'get', entry]),
       (stdout) => stdout.match(/^\s*URL:\s*(\S+)\s*$/m)?.[1] ?? '',
     ),
-    removeCommand: `claude mcp remove ${MCP_SERVER_NAME}`,
+    // Without a scope, Claude Code removes the entry from whichever scope holds it.
+    remove: (entry = MCP_SERVER_NAME) => run('claude', ['mcp', 'remove', entry]),
+    removeCommand: (entry = MCP_SERVER_NAME) => `claude mcp remove ${entry}`,
   },
   {
     add: () => run('codex', ['mcp', 'add', MCP_SERVER_NAME, '--url', PROXY_URL]),
     addCommand: `codex mcp add ${MCP_SERVER_NAME} --url ${PROXY_URL}`,
     name: 'Codex',
-    configured: () => lookup(run('codex', ['mcp', 'get', MCP_SERVER_NAME, '--json']), (stdout) => {
+    configured: (entry = MCP_SERVER_NAME) => lookup(run('codex', ['mcp', 'get', entry, '--json']), (stdout) => {
       try {
         return CodexServerSchema.parse(JSON.parse(stdout)).transport.url ?? ''
       } catch {
         return ''
       }
     }),
-    removeCommand: `codex mcp remove ${MCP_SERVER_NAME}`,
+    remove: (entry = MCP_SERVER_NAME) => run('codex', ['mcp', 'remove', entry]),
+    removeCommand: (entry = MCP_SERVER_NAME) => `codex mcp remove ${entry}`,
   },
 ]

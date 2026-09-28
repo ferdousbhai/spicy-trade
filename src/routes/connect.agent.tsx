@@ -10,7 +10,7 @@ import { AgentLoginApproveResponseSchema, AgentLoginPageQuerySchema } from '../d
 import { pageTitle } from '../domain/site'
 
 /**
- * Where `spice-agent login` sends the browser: the member approves the terminal on their own
+ * Where `spicy-trade login` sends the browser: the member approves the terminal on their own
  * machine, and the browser is handed back to that terminal's loopback listener with a one-time
  * code. The flow and why the token never rides in a URL are in `src/domain/agent-login.ts`.
  *
@@ -97,7 +97,7 @@ function ConnectAgentPage() {
       )}
       {viewer.phase === 'ready' && !query.success && (
         <p className="authorize-error">
-          This sign-in link is incomplete or malformed. Run <code>spice-agent login</code> again from your
+          This sign-in link is incomplete or malformed. Run <code>spicy-trade login</code> again from your
           terminal.
         </p>
       )}
@@ -120,7 +120,7 @@ function ConnectAgentPage() {
             Approving creates an agent token for that machine. It is stored only in that machine&apos;s
             keyring, and you can revoke it any time from the Connect tab.
           </p>
-          <p>Approve only if you just ran <code>spice-agent</code> on this computer.</p>
+          <p>Approve only if you just ran <code>spicy-trade</code> on this computer.</p>
           {failure && <p className="authorize-error">{failure}</p>}
           <div className="authorize-actions">
             <Button

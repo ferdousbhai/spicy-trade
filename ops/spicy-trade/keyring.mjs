@@ -3,6 +3,8 @@ import { access, constants } from 'node:fs/promises'
 import { delimiter, join } from 'node:path'
 import { promisify } from 'node:util'
 
+import { AGENT_TOKEN_SERVICE, LEGACY_AGENT_TOKEN_SERVICE, MCP_TOKEN_KEY } from './config.mjs'
+
 /**
  * Keyring access for the local tools, shared so the proxy and `connect-tastytrade.mjs` read the
  * same entries the same way. It is its own module because importing `proxy.mjs` starts the proxy.
@@ -70,6 +72,41 @@ export function keyringStore(service, key, label, value) {
     child.stdin.on('error', () => {})
     child.stdin.end(value)
   })
+}
+
+/**
+ * Remove an entry. Resolves true when secret-tool exits 0, which it also does when there was
+ * nothing to remove.
+ */
+export function keyringClear(service, key) {
+  return new Promise((resolve) => {
+    const child = spawn('secret-tool', ['clear', 'service', service, 'key', key], { stdio: 'ignore' })
+    child.on('error', () => resolve(false))
+    child.on('close', (status) => resolve(status === 0))
+  })
+}
+
+/**
+ * The agent token: from its current entry, else from the one an install from before the rename
+ * filed it under (see `config.mjs`), so that install keeps working until `login` moves it.
+ */
+export async function agentToken(program) {
+  return await keyringSecret(program, AGENT_TOKEN_SERVICE, MCP_TOKEN_KEY)
+    ?? await keyringSecret(program, LEGACY_AGENT_TOKEN_SERVICE, MCP_TOKEN_KEY)
+}
+
+/**
+ * Store the agent token under its current entry and read it back, then drop the legacy entry so
+ * a later read cannot fall back to a token this one replaced. False when the store did not take;
+ * the legacy entry is then left, since it may be the only token this machine has.
+ */
+export async function storeAgentToken(program, token) {
+  if (!await keyringStore(AGENT_TOKEN_SERVICE, MCP_TOKEN_KEY, 'spicy.trade agent token', token)
+    || await keyringSecret(program, AGENT_TOKEN_SERVICE, MCP_TOKEN_KEY) !== token) {
+    return false
+  }
+  await keyringClear(LEGACY_AGENT_TOKEN_SERVICE, MCP_TOKEN_KEY)
+  return true
 }
 
 /**

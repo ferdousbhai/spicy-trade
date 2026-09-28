@@ -30,6 +30,10 @@ function renderInteractive() {
 describe('Connect screen copy', () => {
   it('gives a proxy add command with no Authorization header, for the default client', () => {
     const html = renderToStaticMarkup(createElement(ConnectScreen, { owner: false }))
+    // One command is the proxy path; it is also the repair, and doctor says which step to repair.
+    expect(html).toContain('./ops/spice-agent/spice-agent.mjs setup')
+    expect(html).toContain('./ops/spice-agent/spice-agent.mjs doctor')
+    // The manual steps stay documented beneath it, for a machine the command does not fit.
     expect(html).toContain('claude mcp add --transport http spice http://127.0.0.1:8787/mcp')
     expect(html).toContain('./ops/spice-agent/store-credentials.sh mcp-token')
     expect(html).toContain('./ops/spice-agent/store-credentials.sh tastytrade')

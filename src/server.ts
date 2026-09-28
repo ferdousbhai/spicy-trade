@@ -98,5 +98,16 @@ export default {
         'BrokerAuthorizationSweepFailed',
         cause instanceof Error ? cause.name : 'UnknownError',
       )))
+    // Likewise a member's lapsed terminal sign-ins, whose CLI never came back to redeem them.
+    context.waitUntil(import('./server/agent-logins')
+      .then(({ sweepExpiredAgentLogins }) => sweepExpiredAgentLogins(env, scheduledAt))
+      .then((loginCount) => console.info(JSON.stringify({
+        event: 'AgentLoginsSwept',
+        loginCount,
+      })))
+      .catch((cause: unknown) => console.error(
+        'AgentLoginSweepFailed',
+        cause instanceof Error ? cause.name : 'UnknownError',
+      )))
   },
 }

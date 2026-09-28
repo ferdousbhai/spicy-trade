@@ -22,6 +22,12 @@ const addCommands = (url: string) => ({
   grok: `grok mcp add --transport http spice ${url}`,
   other: undefined,
 }) satisfies Record<AgentClient, string | undefined>
+/**
+ * The one command for the proxy path: it runs the browser sign-in, the keyring, the service, the
+ * brokerage and the agent's config in order, and is also the repair when any of them is missing.
+ */
+const SETUP_COMMAND = './ops/spice-agent/spice-agent.mjs setup'
+const DOCTOR_COMMAND = './ops/spice-agent/spice-agent.mjs doctor'
 /** Reads the spicy.trade token from the keyring, so it needs the token stored first. */
 const CONNECT_TASTYTRADE_COMMAND = './ops/spice-agent/connect-tastytrade.mjs'
 
@@ -298,37 +304,48 @@ export function ConnectScreen({ owner }: { owner: boolean }) {
       <details className="connect-step connect-fold">
         <summary><h2>2 · Local proxy <span className="connect-optional">optional</span></h2></summary>
         <p>
-          A process on this machine attaches the spicy.trade token from the keyring so the agent holds
-          none. That is how live quotes, chains, and Greeks reach a client that cannot complete a
-          browser sign-in.
+          A process on this machine attaches your spicy.trade token, and your brokerage&apos;s short-lived
+          token, from the keyring, so the agent holds neither. That is how balances, positions and
+          orders reach your agent, and how any client that cannot complete a browser sign-in gets
+          live quotes, chains, and Greeks. From a checkout of this repository, run:
         </p>
-        <CopyBlock
-          label="Store your spicy.trade token"
-          value={'./ops/spice-agent/store-credentials.sh mcp-token'}
-        />
-        <p>Issue the token in step 3, paste it at the prompt. The script restarts the proxy.</p>
-        {proxyCommand
-          ? <CopyBlock label={AGENT_CLIENT_NAMES[client]} value={proxyCommand} />
-          : <CopyBlock label="Streamable HTTP server" value={PROXY_URL} />}
-        <p className="connect-note">
-          No <code>Authorization</code> header. Pointing at <code>{MCP_ENDPOINT}</code> without signing
-          in is the public snapshot: cached quotes, no chains, no account.
-          {client === 'grok' && <> Grok lists tools, not prompts; every tool&apos;s own description carries its contract.</>}
-        </p>
+        <CopyBlock label="Set up the proxy" value={SETUP_COMMAND} />
         <p>
-          A brokerage is a second store: balances, positions, order history, and orders against
-          your account only. Run this, approve spicy.trade on tastytrade&apos;s own page, and the grant
-          lands in your keyring — spicy.trade never keeps it. The script restarts the proxy.
+          It signs you in through the browser, stores the token in your keyring, installs the proxy,
+          offers to connect tastytrade, and adds spicy.trade to your agent. Run it again at any time;
+          it skips what is already done. If something stops working, run{' '}
+          <code>{DOCTOR_COMMAND}</code> and it names the step to fix.
         </p>
-        <CopyBlock label="Connect tastytrade" value={CONNECT_TASTYTRADE_COMMAND} />
-        <p className="connect-note">
-          Already use a personal OAuth grant from my.tastytrade.com? Store it instead; keep only
-          one kind, or the proxy will not start.
-        </p>
-        <CopyBlock
-          label="Store a personal grant"
-          value={'./ops/spice-agent/store-credentials.sh tastytrade'}
-        />
+        <details className="connect-manual">
+          <summary>Manual setup</summary>
+          <CopyBlock
+            label="Store your spicy.trade token"
+            value={'./ops/spice-agent/store-credentials.sh mcp-token'}
+          />
+          <p>Issue the token in step 3, paste it at the prompt. The script restarts the proxy.</p>
+          {proxyCommand
+            ? <CopyBlock label={AGENT_CLIENT_NAMES[client]} value={proxyCommand} />
+            : <CopyBlock label="Streamable HTTP server" value={PROXY_URL} />}
+          <p className="connect-note">
+            No <code>Authorization</code> header. Pointing at <code>{MCP_ENDPOINT}</code> without signing
+            in is the public snapshot: cached quotes, no chains, no account.
+            {client === 'grok' && <> Grok lists tools, not prompts; every tool&apos;s own description carries its contract.</>}
+          </p>
+          <p>
+            A brokerage is a second store: balances, positions, order history, and orders against
+            your account only. Run this, approve spicy.trade on tastytrade&apos;s own page, and the grant
+            lands in your keyring — spicy.trade never keeps it. The script restarts the proxy.
+          </p>
+          <CopyBlock label="Connect tastytrade" value={CONNECT_TASTYTRADE_COMMAND} />
+          <p className="connect-note">
+            Already use a personal OAuth grant from my.tastytrade.com? Store it instead; keep only
+            one kind, or the proxy will not start.
+          </p>
+          <CopyBlock
+            label="Store a personal grant"
+            value={'./ops/spice-agent/store-credentials.sh tastytrade'}
+          />
+        </details>
       </details>
 
       <details className="connect-step connect-fold">

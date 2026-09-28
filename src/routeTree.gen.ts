@@ -18,6 +18,7 @@ import { Route as TermsRouteImport } from './routes/terms'
 import { Route as AppConnectRouteImport } from './routes/_app.connect'
 import { Route as AppRecommendationsRouteImport } from './routes/_app.recommendations'
 import { Route as AppWatchRouteImport } from './routes/_app.watch'
+import { Route as ApiAgentLoginsRouteImport } from './routes/api.agent-logins'
 import { Route as ApiFavoritesRouteImport } from './routes/api.favorites'
 import { Route as ApiHealthRouteImport } from './routes/api.health'
 import { Route as ApiMcpTokensRouteImport } from './routes/api.mcp-tokens'
@@ -33,6 +34,8 @@ import { Route as ApiStreamRouteImport } from './routes/api.stream'
 import { Route as ApiViewerRouteImport } from './routes/api.viewer'
 import { Route as AuthorizeIndexRouteImport } from './routes/authorize.index'
 import { Route as AuthorizeConsentRouteImport } from './routes/authorize.consent'
+import { Route as ConnectAgentRouteImport } from './routes/connect.agent'
+import { Route as ApiAgentLoginsExchangeRouteImport } from './routes/api.agent-logins.exchange'
 import { Route as ApiAuthSplatRouteImport } from './routes/api.auth.$'
 import { Route as ApiBrokersTastytradeAuthorizeRouteImport } from './routes/api.brokers.tastytrade.authorize'
 import { Route as ApiBrokersTastytradeCallbackRouteImport } from './routes/api.brokers.tastytrade.callback'
@@ -82,6 +85,11 @@ const AppWatchRoute = AppWatchRouteImport.update({
   id: '/watch',
   path: '/watch',
   getParentRoute: () => AppRoute,
+} as any)
+const ApiAgentLoginsRoute = ApiAgentLoginsRouteImport.update({
+  id: '/api/agent-logins',
+  path: '/api/agent-logins',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const ApiFavoritesRoute = ApiFavoritesRouteImport.update({
   id: '/api/favorites',
@@ -159,6 +167,16 @@ const AuthorizeConsentRoute = AuthorizeConsentRouteImport.update({
   path: '/consent',
   getParentRoute: () => AuthorizeRoute,
 } as any)
+const ConnectAgentRoute = ConnectAgentRouteImport.update({
+  id: '/connect/agent',
+  path: '/connect/agent',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAgentLoginsExchangeRoute = ApiAgentLoginsExchangeRouteImport.update({
+  id: '/exchange',
+  path: '/exchange',
+  getParentRoute: () => ApiAgentLoginsRoute,
+} as any)
 const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   id: '/api/auth/$',
   path: '/api/auth/$',
@@ -198,6 +216,7 @@ export interface FileRoutesByFullPath {
   '/connect': typeof AppConnectRoute
   '/recommendations': typeof AppRecommendationsRoute
   '/watch': typeof AppWatchRoute
+  '/api/agent-logins': typeof ApiAgentLoginsRouteWithChildren
   '/api/favorites': typeof ApiFavoritesRoute
   '/api/health': typeof ApiHealthRoute
   '/api/mcp-tokens': typeof ApiMcpTokensRoute
@@ -212,7 +231,9 @@ export interface FileRoutesByFullPath {
   '/api/stream': typeof ApiStreamRoute
   '/api/viewer': typeof ApiViewerRoute
   '/authorize/consent': typeof AuthorizeConsentRoute
+  '/connect/agent': typeof ConnectAgentRoute
   '/authorize/': typeof AuthorizeIndexRoute
+  '/api/agent-logins/exchange': typeof ApiAgentLoginsExchangeRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/brokers/tastytrade/authorize': typeof ApiBrokersTastytradeAuthorizeRoute
   '/api/brokers/tastytrade/callback': typeof ApiBrokersTastytradeCallbackRoute
@@ -227,6 +248,7 @@ export interface FileRoutesByTo {
   '/connect': typeof AppConnectRoute
   '/recommendations': typeof AppRecommendationsRoute
   '/watch': typeof AppWatchRoute
+  '/api/agent-logins': typeof ApiAgentLoginsRouteWithChildren
   '/api/favorites': typeof ApiFavoritesRoute
   '/api/health': typeof ApiHealthRoute
   '/api/mcp-tokens': typeof ApiMcpTokensRoute
@@ -241,7 +263,9 @@ export interface FileRoutesByTo {
   '/api/stream': typeof ApiStreamRoute
   '/api/viewer': typeof ApiViewerRoute
   '/authorize/consent': typeof AuthorizeConsentRoute
+  '/connect/agent': typeof ConnectAgentRoute
   '/authorize': typeof AuthorizeIndexRoute
+  '/api/agent-logins/exchange': typeof ApiAgentLoginsExchangeRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/brokers/tastytrade/authorize': typeof ApiBrokersTastytradeAuthorizeRoute
   '/api/brokers/tastytrade/callback': typeof ApiBrokersTastytradeCallbackRoute
@@ -259,6 +283,7 @@ export interface FileRoutesById {
   '/_app/connect': typeof AppConnectRoute
   '/_app/recommendations': typeof AppRecommendationsRoute
   '/_app/watch': typeof AppWatchRoute
+  '/api/agent-logins': typeof ApiAgentLoginsRouteWithChildren
   '/api/favorites': typeof ApiFavoritesRoute
   '/api/health': typeof ApiHealthRoute
   '/api/mcp-tokens': typeof ApiMcpTokensRoute
@@ -273,7 +298,9 @@ export interface FileRoutesById {
   '/api/stream': typeof ApiStreamRoute
   '/api/viewer': typeof ApiViewerRoute
   '/authorize/consent': typeof AuthorizeConsentRoute
+  '/connect/agent': typeof ConnectAgentRoute
   '/authorize/': typeof AuthorizeIndexRoute
+  '/api/agent-logins/exchange': typeof ApiAgentLoginsExchangeRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/brokers/tastytrade/authorize': typeof ApiBrokersTastytradeAuthorizeRoute
   '/api/brokers/tastytrade/callback': typeof ApiBrokersTastytradeCallbackRoute
@@ -291,6 +318,7 @@ export interface FileRouteTypes {
     | '/connect'
     | '/recommendations'
     | '/watch'
+    | '/api/agent-logins'
     | '/api/favorites'
     | '/api/health'
     | '/api/mcp-tokens'
@@ -305,7 +333,9 @@ export interface FileRouteTypes {
     | '/api/stream'
     | '/api/viewer'
     | '/authorize/consent'
+    | '/connect/agent'
     | '/authorize/'
+    | '/api/agent-logins/exchange'
     | '/api/auth/$'
     | '/api/brokers/tastytrade/authorize'
     | '/api/brokers/tastytrade/callback'
@@ -320,6 +350,7 @@ export interface FileRouteTypes {
     | '/connect'
     | '/recommendations'
     | '/watch'
+    | '/api/agent-logins'
     | '/api/favorites'
     | '/api/health'
     | '/api/mcp-tokens'
@@ -334,7 +365,9 @@ export interface FileRouteTypes {
     | '/api/stream'
     | '/api/viewer'
     | '/authorize/consent'
+    | '/connect/agent'
     | '/authorize'
+    | '/api/agent-logins/exchange'
     | '/api/auth/$'
     | '/api/brokers/tastytrade/authorize'
     | '/api/brokers/tastytrade/callback'
@@ -351,6 +384,7 @@ export interface FileRouteTypes {
     | '/_app/connect'
     | '/_app/recommendations'
     | '/_app/watch'
+    | '/api/agent-logins'
     | '/api/favorites'
     | '/api/health'
     | '/api/mcp-tokens'
@@ -365,7 +399,9 @@ export interface FileRouteTypes {
     | '/api/stream'
     | '/api/viewer'
     | '/authorize/consent'
+    | '/connect/agent'
     | '/authorize/'
+    | '/api/agent-logins/exchange'
     | '/api/auth/$'
     | '/api/brokers/tastytrade/authorize'
     | '/api/brokers/tastytrade/callback'
@@ -380,6 +416,7 @@ export interface RootRouteChildren {
   DisclosuresRoute: typeof DisclosuresRoute
   PrivacyRoute: typeof PrivacyRoute
   TermsRoute: typeof TermsRoute
+  ApiAgentLoginsRoute: typeof ApiAgentLoginsRouteWithChildren
   ApiFavoritesRoute: typeof ApiFavoritesRoute
   ApiHealthRoute: typeof ApiHealthRoute
   ApiMcpTokensRoute: typeof ApiMcpTokensRoute
@@ -393,6 +430,7 @@ export interface RootRouteChildren {
   ApiSnapshotRoute: typeof ApiSnapshotRoute
   ApiStreamRoute: typeof ApiStreamRoute
   ApiViewerRoute: typeof ApiViewerRoute
+  ConnectAgentRoute: typeof ConnectAgentRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
   ApiBrokersTastytradeAuthorizeRoute: typeof ApiBrokersTastytradeAuthorizeRoute
   ApiBrokersTastytradeCallbackRoute: typeof ApiBrokersTastytradeCallbackRoute
@@ -464,6 +502,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/watch'
       preLoaderRoute: typeof AppWatchRouteImport
       parentRoute: typeof AppRoute
+    }
+    '/api/agent-logins': {
+      id: '/api/agent-logins'
+      path: '/api/agent-logins'
+      fullPath: '/api/agent-logins'
+      preLoaderRoute: typeof ApiAgentLoginsRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/api/favorites': {
       id: '/api/favorites'
@@ -570,6 +615,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthorizeConsentRouteImport
       parentRoute: typeof AuthorizeRoute
     }
+    '/connect/agent': {
+      id: '/connect/agent'
+      path: '/connect/agent'
+      fullPath: '/connect/agent'
+      preLoaderRoute: typeof ConnectAgentRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/agent-logins/exchange': {
+      id: '/api/agent-logins/exchange'
+      path: '/exchange'
+      fullPath: '/api/agent-logins/exchange'
+      preLoaderRoute: typeof ApiAgentLoginsExchangeRouteImport
+      parentRoute: typeof ApiAgentLoginsRoute
+    }
     '/api/auth/$': {
       id: '/api/auth/$'
       path: '/api/auth/$'
@@ -636,6 +695,18 @@ const AuthorizeRouteWithChildren = AuthorizeRoute._addFileChildren(
   AuthorizeRouteChildren,
 )
 
+interface ApiAgentLoginsRouteChildren {
+  ApiAgentLoginsExchangeRoute: typeof ApiAgentLoginsExchangeRoute
+}
+
+const ApiAgentLoginsRouteChildren: ApiAgentLoginsRouteChildren = {
+  ApiAgentLoginsExchangeRoute: ApiAgentLoginsExchangeRoute,
+}
+
+const ApiAgentLoginsRouteWithChildren = ApiAgentLoginsRoute._addFileChildren(
+  ApiAgentLoginsRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AppRoute: AppRouteWithChildren,
@@ -643,6 +714,7 @@ const rootRouteChildren: RootRouteChildren = {
   DisclosuresRoute: DisclosuresRoute,
   PrivacyRoute: PrivacyRoute,
   TermsRoute: TermsRoute,
+  ApiAgentLoginsRoute: ApiAgentLoginsRouteWithChildren,
   ApiFavoritesRoute: ApiFavoritesRoute,
   ApiHealthRoute: ApiHealthRoute,
   ApiMcpTokensRoute: ApiMcpTokensRoute,
@@ -656,6 +728,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiSnapshotRoute: ApiSnapshotRoute,
   ApiStreamRoute: ApiStreamRoute,
   ApiViewerRoute: ApiViewerRoute,
+  ConnectAgentRoute: ConnectAgentRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
   ApiBrokersTastytradeAuthorizeRoute: ApiBrokersTastytradeAuthorizeRoute,
   ApiBrokersTastytradeCallbackRoute: ApiBrokersTastytradeCallbackRoute,

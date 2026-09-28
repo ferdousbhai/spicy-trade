@@ -5,6 +5,7 @@ import { chmod, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
+import { z } from 'zod'
 
 import { tokenRetiresAt, UPSTREAM_TIMEOUT_MS } from '../ops/spice-agent/token-refresh.mjs'
 import { fakeSecretTool } from './fake-secret-tool.ts'
@@ -543,4 +544,130 @@ describe('broker token retirement', () => {
   it('keeps a token too short-lived to spare a whole timeout for nine tenths of its life', () => {
     expect(tokenRetiresAt(1_000, 100_000, UPSTREAM_TIMEOUT_MS)).toBe(1_000 + 90_000)
   })
+})
+
+/** The JSON-RPC error the proxy answers a failed request with; any other shape fails the parse. */
+const ProxyFailureSchema = z.strictObject({
+  error: z.strictObject({ code: z.number().int(), message: z.string() }),
+  id: z.union([z.number(), z.string(), z.null()]),
+  jsonrpc: z.literal('2.0'),
+})
+
+/** What a test sends: a request when it has an id, a notification when it does not. */
+type JsonRpcMessage = { id?: number | string; jsonrpc: '2.0'; method: string }
+
+/** What the stand-in Worker answers the app-grant mint with, changed between calls. */
+type WorkerAnswer = { body: { error: string; tastytradeStatus?: number }; status: number }
+
+describe('local agent proxy failures an agent can act on', () => {
+  async function failingCall(proxyPort: number, body: JsonRpcMessage) {
+    const reply = await fetch(`http://127.0.0.1:${proxyPort}/mcp`, {
+      body: JSON.stringify(body),
+      headers: { 'content-type': 'application/json' },
+      method: 'POST',
+    })
+    return { failure: ProxyFailureSchema.parse(await reply.json()), status: reply.status }
+  }
+
+  it('answers a Worker refusal of the agent token with the command that signs in again', async () => {
+    const port = await listen((request, response) => {
+      request.resume()
+      request.on('end', () => {
+        // The Worker's own 401 challenge, which must not reach the client as one.
+        response.writeHead(401, { 'content-type': 'application/json', 'www-authenticate': 'Bearer' })
+        response.end(JSON.stringify({ error: 'invalid_token' }))
+      })
+    })
+    const keyring = await fakeKeyring({ 'spice/mcp-token': SPICE_TOKEN })
+    const proxyPort = 18_801
+    await startProxy({ PATH: `${keyring}:${process.env.PATH ?? ''}`, SPICE_MCP_URL: `http://127.0.0.1:${port}/mcp` }, proxyPort)
+    let stderr = ''
+    proxy!.stderr?.on('data', (chunk: Buffer) => { stderr += chunk.toString() })
+
+    const { failure, status } = await failingCall(proxyPort, { id: 7, jsonrpc: '2.0', method: 'tools/list' })
+    // Not relayed as a 401: that would send an MCP client looking for an OAuth flow here.
+    expect(status).toBe(502)
+    expect(failure.jsonrpc).toBe('2.0')
+    expect(failure.id).toBe(7)
+    expect(failure.error.code).toBe(-32001)
+    expect(failure.error.message).toMatch(/^spicy\.trade rejected the agent token in this machine's keyring\. Run: \S*spice-agent(\.mjs)? login$/)
+    await expect.poll(() => stderr).toContain('SpiceAgentProxy: POST AgentTokenRefused 401\n')
+    expect(JSON.stringify(failure)).not.toContain(SPICE_TOKEN)
+    expect(stderr).not.toContain(SPICE_TOKEN)
+  }, 30_000)
+
+  it('answers a refused app-grant mint by what was refused, and a notification with a null id', async () => {
+    let refusal: WorkerAnswer = { body: { error: 'Unauthorized' }, status: 401 }
+    const port = await listen((request, response) => {
+      request.resume()
+      request.on('end', () => {
+        response.writeHead(refusal.status, { 'content-type': 'application/json' })
+        response.end(JSON.stringify(refusal.body))
+      })
+    })
+    const keyring = await fakeKeyring({
+      'spice/mcp-token': SPICE_TOKEN,
+      'tastytrade/app-refresh-token': REFRESH_TOKEN,
+    })
+    const proxyPort = 18_802
+    await startProxy({ PATH: `${keyring}:${process.env.PATH ?? ''}`, SPICE_MCP_URL: `http://127.0.0.1:${port}/mcp` }, proxyPort)
+
+    // The Worker refused the agent token on the mint itself.
+    refusal = { body: { error: 'Unauthorized' }, status: 401 }
+    const tokenRefused = await failingCall(proxyPort, { id: 'a', jsonrpc: '2.0', method: 'tools/list' })
+    expect(tokenRefused.status).toBe(502)
+    expect(tokenRefused.failure.id).toBe('a')
+    expect(tokenRefused.failure.error.code).toBe(-32001)
+    expect(tokenRefused.failure.error.message).toMatch(/ login$/)
+
+    // tastytrade refused the grant, relayed by the Worker: reconnect, not sign in.
+    refusal = { body: { error: 'tastytrade refused the grant', tastytradeStatus: 401 }, status: 502 }
+    const grantRefused = await failingCall(proxyPort, { jsonrpc: '2.0', method: 'notifications/initialized' })
+    expect(grantRefused.status).toBe(502)
+    expect(grantRefused.failure.id).toBeNull()
+    expect(grantRefused.failure.error.code).toBe(-32002)
+    expect(grantRefused.failure.error.message).toMatch(/^tastytrade refused this machine's brokerage connection \(HTTP 401\)\. Reconnect with: \S*spice-agent(\.mjs)? connect-tastytrade$/)
+    expect(JSON.stringify(grantRefused.failure)).not.toContain(REFRESH_TOKEN)
+  }, 30_000)
+
+  it('answers a refused personal grant with the command that stores a new one', async () => {
+    const port = await listen((request, response) => {
+      request.resume()
+      request.on('end', () => {
+        response.writeHead(401, { 'content-type': 'application/json' })
+        response.end(JSON.stringify({ error: 'invalid_grant' }))
+      })
+    })
+    const keyring = await fakeKeyring({
+      'spice/mcp-token': SPICE_TOKEN,
+      'tastytrade/client-secret': CLIENT_SECRET,
+      'tastytrade/refresh-token': REFRESH_TOKEN,
+    })
+    const proxyPort = 18_803
+    await startProxy({
+      PATH: `${keyring}:${process.env.PATH ?? ''}`,
+      SPICE_MCP_URL: `http://127.0.0.1:${port}/mcp`,
+      TASTYTRADE_API_BASE: `http://127.0.0.1:${port}`,
+    }, proxyPort)
+
+    const { failure } = await failingCall(proxyPort, { id: 1, jsonrpc: '2.0', method: 'tools/list' })
+    expect(failure.error.code).toBe(-32002)
+    expect(failure.error.message).toMatch(/personal grant \(HTTP 401\).*store-credentials\.sh tastytrade$/)
+    expect(JSON.stringify(failure)).not.toContain(CLIENT_SECRET)
+  }, 30_000)
+
+  it('answers an unreachable Worker by naming it and the transport failure', async () => {
+    // A port that was listening and is closed again, so nothing answers on it.
+    const port = await listen(() => {})
+    await new Promise<void>((resolve) => upstream!.close(() => resolve()))
+    upstream = undefined
+    const keyring = await fakeKeyring({ 'spice/mcp-token': SPICE_TOKEN })
+    const proxyPort = 18_804
+    await startProxy({ PATH: `${keyring}:${process.env.PATH ?? ''}`, SPICE_MCP_URL: `http://127.0.0.1:${port}/mcp` }, proxyPort)
+
+    const { failure, status } = await failingCall(proxyPort, { id: 1, jsonrpc: '2.0', method: 'tools/list' })
+    expect(status).toBe(502)
+    expect(failure.error.code).toBe(-32003)
+    expect(failure.error.message).toMatch(/^spicy\.trade could not be reached from this machine \(ECONNREFUSED\)\. .* doctor$/)
+  }, 30_000)
 })

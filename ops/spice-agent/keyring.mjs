@@ -1,4 +1,6 @@
 import { execFile, spawn } from 'node:child_process'
+import { access, constants } from 'node:fs/promises'
+import { delimiter, join } from 'node:path'
 import { promisify } from 'node:util'
 
 /**
@@ -16,6 +18,19 @@ import { promisify } from 'node:util'
  */
 
 const execFileAsync = promisify(execFile)
+
+/** Whether a `secret-tool` is on PATH, for tools that should say so before failing on it. */
+export async function secretToolInstalled() {
+  for (const directory of (process.env.PATH ?? '').split(delimiter).filter(Boolean)) {
+    try {
+      await access(join(directory, 'secret-tool'), constants.X_OK)
+      return true
+    } catch {
+      // Not in this directory.
+    }
+  }
+  return false
+}
 
 /**
  * The stored value, or undefined when there is none.

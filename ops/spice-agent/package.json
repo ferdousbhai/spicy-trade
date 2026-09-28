@@ -1,0 +1,22 @@
+{
+  "name": "spicy-trade-agent",
+  "version": "0.1.0",
+  "description": "The spicy.trade local agent: browser sign-in, the keyring-backed MCP proxy, and its setup",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "spice-agent": "spice-agent.mjs"
+  },
+  "files": [
+    "*.mjs",
+    "*.d.mts",
+    "store-credentials.sh",
+    "systemd/spice-agent-proxy.service"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "zod": "^4.4.3"
+  }
+}

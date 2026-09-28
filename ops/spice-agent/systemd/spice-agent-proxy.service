@@ -1,5 +1,8 @@
-# The local brokerage credential broker for an agent on this machine. Enable with
-#   systemctl --user enable --now spice-agent-proxy.service
+# The local brokerage credential broker for an agent on this machine. Install it with
+#   ./ops/spice-agent/spice-agent.mjs setup
+# which writes this file to ~/.config/systemd/user/ with ExecStart replaced by this install's own
+# node and proxy.mjs, both by absolute path, and enables it. The ExecStart below is only what a
+# hand copy into a checkout at this path would run.
 # Credentials are read from the OS keyring once, at startup, so nothing secret lives in this
 # unit, in the environment block, or in any argv. Restart the unit after changing them.
 [Unit]

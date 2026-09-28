@@ -66,7 +66,7 @@ export class McpTokenLimitError extends Error {
  * This uses only standard WebCrypto rather than the Workers `timingSafeEqual` extension, so the
  * production path and the tested path are the same code.
  */
-async function constantTimeDigestMatch(provided: string, expected: string): Promise<boolean> {
+export async function constantTimeDigestMatch(provided: string, expected: string): Promise<boolean> {
   const encoder = new TextEncoder()
   const [a, b] = await Promise.all([
     crypto.subtle.digest('SHA-256', encoder.encode(provided)),

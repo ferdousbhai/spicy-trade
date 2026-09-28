@@ -7,24 +7,28 @@
 # readable by any tool the agent can run, and a tastytrade refresh token never expires.
 set -euo pipefail
 
+mcp_url=${SPICE_MCP_URL:-https://spicy.trade/mcp}
+agent_cli="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/spice-agent.mjs"
 
 usage() {
   cat <<'EOF'
 Usage: store-credentials.sh [mcp-token|tastytrade]
 
-  mcp-token   The spicy.trade agent token, created in the web app's Connect tab
-              (default).
+The easy path is one command, which signs in from the browser with nothing to paste:
+
+  spice-agent setup     (from a checkout: ./ops/spice-agent/spice-agent.mjs setup)
+
+This script is for pasting a credential by hand instead:
+
+  mcp-token   A spicy.trade agent token, created under "Headless access" in the
+              web app's Connect tab (default). It is checked against spicy.trade
+              before it is kept.
   tastytrade  A personal grant instead of spicy.trade's tastytrade app: the client
               secret and refresh token from my.tastytrade.com > OAuth
               Applications > Manage > Create Grant. The read and trade scopes
               need two-factor auth on your account.
 
 Each value is prompted for; nothing is passed on the command line.
-
-To connect tastytrade the usual way -- approve spicy.trade on tastytrade's own page,
-with no client secret to copy -- store the spicy.trade token, then run:
-
-  ./ops/spice-agent/connect-tastytrade.mjs
 
 Keep one kind of tastytrade credential: the proxy refuses to start with both.
 EOF
@@ -44,6 +48,37 @@ store() {
   echo "  stored ${service}/${key}"
 }
 
+# The spicy.trade agent token is checked the way an agent would use it -- a tools/list on the MCP
+# endpoint -- so a token that would only fail later, inside the proxy, is refused here instead.
+# The token reaches curl on stdin, as a config line, never as an argument other processes can
+# read. A 401 clears the entry: a token spicy.trade rejects is worth nothing kept. No answer at
+# all keeps it, since that says nothing about the token, and says to check again later. The
+# timeout is the proxy's budget for one forwarded call (UPSTREAM_TIMEOUT_MS), which this is.
+check_mcp_token() {
+  if ! command -v curl >/dev/null; then
+    echo '  curl is not installed, so the token was stored unchecked.' >&2
+    return
+  fi
+  local status
+  status=$(printf 'header = "Authorization: Bearer %s"\n' "$(secret-tool lookup service spice key mcp-token)" \
+    | curl --silent --output /dev/null --write-out '%{http_code}' --max-time 60 --config - \
+      --header 'Accept: application/json, text/event-stream' --header 'Content-Type: application/json' \
+      --data '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}' "${mcp_url}" || true)
+  case "${status}" in
+    401)
+      secret-tool clear service spice key mcp-token
+      echo '  spicy.trade rejected that token, so it was not kept. Sign in from the browser instead:' >&2
+      echo "    ${agent_cli} login" >&2
+      exit 1
+      ;;
+    2??) echo '  spicy.trade accepted the token' ;;
+    *)
+      echo "  spicy.trade could not check the token (${status:-no answer}); it is stored unchecked. Check later with:" >&2
+      echo "    ${agent_cli} doctor" >&2
+      ;;
+  esac
+}
+
 command -v secret-tool >/dev/null || { echo 'secret-tool is not installed (package: libsecret).' >&2; exit 1; }
 
 # The default is the spicy.trade token alone. A personal grant is the exception now that tastytrade
@@ -58,11 +93,12 @@ esac
 
 if [[ ${want_mcp} -eq 1 ]]; then
   store spice mcp-token 'spicy.trade agent token' 'spicy.trade agent token (Connect tab in the web app):'
+  check_mcp_token
   if ! secret-tool lookup service tastytrade key app-refresh-token >/dev/null 2>&1 \
     && ! secret-tool lookup service tastytrade key refresh-token >/dev/null 2>&1; then
     echo
     echo 'No tastytrade connection yet. To add one, approve spicy.trade on tastytrade with:'
-    echo '  ./ops/spice-agent/connect-tastytrade.mjs'
+    echo "  ${agent_cli} connect-tastytrade"
   fi
 fi
 
@@ -76,12 +112,11 @@ if systemctl --user is-enabled spice-agent-proxy.service >/dev/null 2>&1; then
   systemctl --user restart spice-agent-proxy.service
   echo
   systemctl --user is-active spice-agent-proxy.service >/dev/null \
-    && echo 'Proxy restarted. Check what it picked up with:' \
-    || echo 'Proxy failed to restart; check:'
-  echo '  journalctl --user -u spice-agent-proxy.service -n 5'
+    && echo 'Proxy restarted. Check everything with:' \
+    || echo 'Proxy failed to restart. Find out why with:'
+  echo "  ${agent_cli} doctor"
 else
   echo
-  echo 'Proxy service is not installed. Enable it with:'
-  echo '  cp ops/spice-agent/systemd/spice-agent-proxy.service ~/.config/systemd/user/'
-  echo '  systemctl --user daemon-reload && systemctl --user enable --now spice-agent-proxy.service'
+  echo 'The proxy service is not installed. Install it with:'
+  echo "  ${agent_cli} setup"
 fi

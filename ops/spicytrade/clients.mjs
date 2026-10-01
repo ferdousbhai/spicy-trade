@@ -49,8 +49,8 @@ function lookup(got, urlOf) {
   return { state: 'configured', url: urlOf(got.stdout) }
 }
 
-/** Whether an entry's URL is this proxy or spicy.trade itself, so the entry is ours to replace. */
-export function namesSpicyTrade(url) {
+/** Whether an entry's URL is this proxy or spicytrade itself, so the entry is ours to replace. */
+export function namesSpicytrade(url) {
   return url === PROXY_URL || url.startsWith(`${ORIGIN}/`)
 }
 

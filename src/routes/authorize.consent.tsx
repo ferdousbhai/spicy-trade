@@ -31,7 +31,7 @@ export const Route = createFileRoute('/authorize/consent')({
  */
 const ConsentResponseSchema = z.object({ redirect: z.boolean(), url: z.string().min(1) })
 const FailureSchema = z.object({ error_description: z.string().min(1) })
-const ANSWER_NOT_RECORDED = 'spicy.trade could not record that answer.'
+const ANSWER_NOT_RECORDED = 'spicytrade could not record that answer.'
 
 function ConsentPage() {
   const viewer = useViewer()
@@ -85,7 +85,7 @@ function ConsentPage() {
           page stopped at its heading, and the member could not tell whether to wait or retry. */}
       {viewer.phase === 'error' && (
         <p className="authorize-error">
-          spicy.trade could not check whether you are signed in. Reload to try again.
+          spicytrade could not check whether you are signed in. Reload to try again.
         </p>
       )}
       {viewer.phase === 'ready' && viewer.user === null && (
@@ -94,18 +94,18 @@ function ConsentPage() {
       {viewer.phase === 'ready' && viewer.user !== null && (
         <>
           <p>
-            An agent is asking to connect to your spicy.trade account, signed in as{' '}
+            An agent is asking to connect to your spicytrade account, signed in as{' '}
             <strong>{viewer.user.name}</strong>. It will be able to read live market data, option
             chains and Greeks, and the shared research, to add symbols to the watchlist, and to record
-            catalysts and evidence that every spicy.trade reader sees.
+            catalysts and evidence that every spicytrade reader sees.
           </p>
           <p>
             It cannot reach your brokerage this way. Balances, positions and order placement need a
             broker credential that stays on your own machine and is sent with each request.
           </p>
           <p>
-            Approve only if you started this from your own agent. Removing spicy.trade from that agent
-            ends its use of this connection; to revoke it on spicy.trade&apos;s side, email{' '}
+            Approve only if you started this from your own agent. Removing spicytrade from that agent
+            ends its use of this connection; to revoke it on spicytrade&apos;s side, email{' '}
             <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>.
           </p>
           {failure && <p className="authorize-error">{failure}</p>}

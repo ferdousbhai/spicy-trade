@@ -13,7 +13,7 @@ import { AGENT_TOKEN_SERVICE, LEGACY_AGENT_TOKEN_SERVICE, MCP_TOKEN_KEY } from '
  * prints the value to our stdout, a store reads it from our stdin.
  *
  * Credentials are filed under the service that issued them, not the app that spends them: the
- * agent token is spicy.trade's, while a client secret and refresh token are tastytrade's and would be
+ * agent token is spicytrade's, while a client secret and refresh token are tastytrade's and would be
  * Schwab's for a Schwab adapter. That keeps the keyring laid out the way the Worker's adapter
  * registry (`brokerAdaptersSeam` in `src/server/brokers/index.ts`) is, so adding a broker adds a
  * service rather than more keys under this one.
@@ -101,7 +101,7 @@ export async function agentToken(program) {
  * the legacy entry is then left, since it may be the only token this machine has.
  */
 export async function storeAgentToken(program, token) {
-  if (!await keyringStore(AGENT_TOKEN_SERVICE, MCP_TOKEN_KEY, 'spicy.trade agent token', token)
+  if (!await keyringStore(AGENT_TOKEN_SERVICE, MCP_TOKEN_KEY, 'spicytrade agent token', token)
     || await keyringSecret(program, AGENT_TOKEN_SERVICE, MCP_TOKEN_KEY) !== token) {
     return false
   }
@@ -114,7 +114,7 @@ export async function storeAgentToken(program, token) {
  * present:
  *   personal grant  `client-secret` + `refresh-token`, from the member's own OAuth app; minted
  *                   directly against tastytrade.
- *   app grant       `app-refresh-token`, from `connect-tastytrade.mjs` under spicy.trade's OAuth app,
+ *   app grant       `app-refresh-token`, from `connect-tastytrade.mjs` under spicytrade's OAuth app,
  *                   whose client secret only the Worker holds; minted through the Worker.
  * Both the proxy and `connect-tastytrade.mjs` need to tell these apart the same way, so the key
  * names and the read live here rather than duplicated in each.

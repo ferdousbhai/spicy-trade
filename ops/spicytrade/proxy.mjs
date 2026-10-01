@@ -12,10 +12,10 @@ import { tokenRetiresAt, UPSTREAM_TIMEOUT_MS } from './token-refresh.mjs'
 /**
  * The brokerage credential broker for a local agent.
  *
- * spicy.trade holds no member's brokerage credential, so one has to reach the Worker on each request.
+ * spicytrade holds no member's brokerage credential, so one has to reach the Worker on each request.
  * It must not reach it through the agent: an MCP config's `${VAR}` interpolation reads the agent
  * process's own environment, which its Bash tool inherits, and a tastytrade refresh token never
- * expires and bypasses every spicy.trade guard. One prompt-injected `printenv | curl` out of the
+ * expires and bypasses every spicytrade guard. One prompt-injected `printenv | curl` out of the
  * untrusted-content pipeline would be permanent, unguarded trading authority.
  *
  * So this runs as its own process. It reads the long-lived credential from the OS keyring,
@@ -28,7 +28,7 @@ import { tokenRetiresAt, UPSTREAM_TIMEOUT_MS } from './token-refresh.mjs'
  * A tastytrade credential comes in one of two kinds, told apart by the keyring entries present:
  *   personal grant  `client-secret` + `refresh-token`, from the member's own OAuth app; minted
  *                   directly against tastytrade.
- *   app grant       `app-refresh-token`, from `connect-tastytrade.mjs` under spicy.trade's OAuth app,
+ *   app grant       `app-refresh-token`, from `connect-tastytrade.mjs` under spicytrade's OAuth app,
  *                   whose client secret only the Worker holds; minted through the Worker.
  * Either way only the 15-minute access token is attached to forwarded requests. A keyring holding
  * both is refused rather than resolved by a precedence rule: which account the agent trades
@@ -37,7 +37,7 @@ import { tokenRetiresAt, UPSTREAM_TIMEOUT_MS } from './token-refresh.mjs'
 
 /** The only broker with an adapter that can place orders; also its keyring service name. */
 const BROKER = TASTYTRADE
-const PROGRAM = 'SpicyTradeProxy'
+const PROGRAM = 'SpicytradeProxy'
 // UPSTREAM_TIMEOUT_MS and TOKEN_REQUEST_TIMEOUT_MS live in token-refresh.mjs because importing
 // this file starts the proxy (`await main()`), so the retirement test takes them from there.
 // A mint runs before, and in addition to, the forwarded call's own UPSTREAM_TIMEOUT_MS, so a call
@@ -82,10 +82,10 @@ const FAILURE_CODES = {
  */
 function failureFor(error, grantKind) {
   const doctor = cliCommand('doctor')
-  if (error instanceof AgentTokenRefused || (error instanceof TastytradeAuthError && error.code === 'spicy-trade-401')) {
+  if (error instanceof AgentTokenRefused || (error instanceof TastytradeAuthError && error.code === 'spicytrade-401')) {
     return {
       code: FAILURE_CODES.agentToken,
-      message: `spicy.trade rejected the agent token in this machine's keyring. Run: ${cliCommand('login')}`,
+      message: `spicytrade rejected the agent token in this machine's keyring. Run: ${cliCommand('login')}`,
     }
   }
   if (error instanceof TastytradeAuthError && Number.isInteger(error.code)) {
@@ -108,17 +108,17 @@ function failureFor(error, grantKind) {
   if (error instanceof Error && error.name === 'TimeoutError') {
     return {
       code: FAILURE_CODES.unreachable,
-      message: `spicy.trade did not answer within ${UPSTREAM_TIMEOUT_MS / 1_000} seconds. Run: ${doctor}`,
+      message: `spicytrade did not answer within ${UPSTREAM_TIMEOUT_MS / 1_000} seconds. Run: ${doctor}`,
     }
   }
   if (error instanceof TypeError && error.cause instanceof Error && 'code' in error.cause) {
     return {
       code: FAILURE_CODES.unreachable,
-      message: `spicy.trade could not be reached from this machine (${String(error.cause.code)}).`
+      message: `spicytrade could not be reached from this machine (${String(error.cause.code)}).`
         + ` Check the network, then run: ${doctor}`,
     }
   }
-  return { code: FAILURE_CODES.other, message: `The spicy.trade proxy could not complete this request. Run: ${doctor}` }
+  return { code: FAILURE_CODES.other, message: `The spicytrade proxy could not complete this request. Run: ${doctor}` }
 }
 
 /** A single JSON-RPC request: all this needs of one is its id, so the error can answer it. */
@@ -146,7 +146,7 @@ async function readBody(request) {
 async function main() {
   const agentBearer = await agentToken(PROGRAM)
   if (!agentBearer) {
-    process.stderr.write(`${PROGRAM}: no spicy.trade token in the keyring. Sign this machine in with:\n`
+    process.stderr.write(`${PROGRAM}: no spicytrade token in the keyring. Sign this machine in with:\n`
       + `  ${cliCommand('login')}\n`)
     process.exit(1)
   }
@@ -172,7 +172,7 @@ async function main() {
 
   const port = PROXY_PORT
   // DNS rebinding: a web page can resolve its own name to 127.0.0.1 and reach this port from the
-  // browser, and every request here leaves carrying the spicy.trade token and a broker token. A
+  // browser, and every request here leaves carrying the spicytrade token and a broker token. A
   // browser always sends that page's name as Host, and sends Origin on a cross-origin request;
   // an MCP client does neither, so a request naming any other host, or carrying an Origin at
   // all, is refused before anything is attached.
@@ -182,7 +182,7 @@ async function main() {
     if (!allowedHosts.has(request.headers.host ?? '') || request.headers.origin !== undefined) {
       request.resume()
       response.writeHead(403, { 'content-type': 'application/json' })
-      response.end(JSON.stringify({ error: 'The spicy.trade proxy only answers local MCP clients' }))
+      response.end(JSON.stringify({ error: 'The spicytrade proxy only answers local MCP clients' }))
       return
     }
     void (async () => {

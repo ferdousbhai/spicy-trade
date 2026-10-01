@@ -87,7 +87,7 @@ export interface BrokerHistoryQuery {
 }
 
 /**
- * Every account read and cancellation spicy.trade performs against a brokerage. Order placement is
+ * Every account read and cancellation spicytrade performs against a brokerage. Order placement is
  * deliberately absent: it still lives in `brokerage.ts` behind its own guards.
  *
  * Each method takes the request-scoped credential explicitly. No adapter may hold, cache,

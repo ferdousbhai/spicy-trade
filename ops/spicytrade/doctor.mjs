@@ -1,7 +1,7 @@
 import { z } from 'zod'
 
 import { grantMinter, TastytradeAuthError } from './broker-grants.mjs'
-import { CLIENTS, namesSpicyTrade } from './clients.mjs'
+import { CLIENTS, namesSpicytrade } from './clients.mjs'
 import {
   AGENT_TOKEN_SERVICE, cliCommand, LEGACY_AGENT_TOKEN_SERVICE, LEGACY_MCP_SERVER_NAME, LEGACY_UNIT_NAME, MCP_SERVER_NAME,
   MCP_TOKEN_KEY, ORIGIN, PROXY_URL, storeCredentialsCommand, UNIT_NAME,
@@ -14,7 +14,7 @@ import { TOKEN_REQUEST_TIMEOUT_MS, UPSTREAM_TIMEOUT_MS } from './token-refresh.m
 import { checkAgentToken, describeTokenCheck } from './worker.mjs'
 
 /**
- * `spicy-trade doctor`: every link between an agent and spicy.trade, checked in the order a
+ * `spicytrade doctor`: every link between an agent and spicytrade, checked in the order a
  * request crosses them, each failure with the one command that fixes it.
  *
  * Output is fixed vocabulary, as everywhere in these tools: a status, a transport code, a path of
@@ -22,7 +22,7 @@ import { checkAgentToken, describeTokenCheck } from './worker.mjs'
  * printed, and the proxy's answer is read only for its JSON-RPC error message.
  */
 
-const PROGRAM = 'SpicyTradeDoctor'
+const PROGRAM = 'SpicytradeDoctor'
 
 /**
  * The proxy's worst case for one call that also mints a broker token: a mint's budget, then the
@@ -50,7 +50,7 @@ function report(out) {
 
 function brokerFailure(error, kind) {
   if (!(error instanceof TastytradeAuthError)) return 'the grant could not be minted'
-  if (error.code === 'spicy-trade-401') return 'spicy.trade rejected the agent token while minting'
+  if (error.code === 'spicytrade-401') return 'spicytrade rejected the agent token while minting'
   if (error.code === 'unreachable') return `${error.party} could not be reached${error.transport ? ` (${error.transport})` : ''}`
   if (Number.isInteger(error.code)) return `tastytrade refused the ${kind === 'app' ? 'connection' : 'personal grant'} (HTTP ${error.code})`
   return `the mint failed (${String(error.code)})`
@@ -64,7 +64,7 @@ async function checkProxy() {
         id: 1,
         jsonrpc: '2.0',
         method: 'initialize',
-        params: { capabilities: {}, clientInfo: { name: 'spicy-trade-doctor', version: '1' }, protocolVersion: MCP_PROTOCOL_VERSION },
+        params: { capabilities: {}, clientInfo: { name: 'spicytrade-doctor', version: '1' }, protocolVersion: MCP_PROTOCOL_VERSION },
       }),
       headers: { Accept: 'application/json, text/event-stream', 'Content-Type': 'application/json' },
       method: 'POST',
@@ -119,7 +119,7 @@ export async function doctor(out = process.stdout) {
     checks.fail('the keyring holds both a tastytrade app grant and a personal grant, so the proxy will not start',
       `Keep one. To keep the personal grant: secret-tool clear service ${TASTYTRADE} key ${APP_REFRESH_TOKEN_KEY}`)
   } else if (credential.kind === 'app' && !token) {
-    checks.fail('tastytrade is connected through spicy.trade, which needs the agent token to mint', `Sign in with: ${cliCommand('login')}`)
+    checks.fail('tastytrade is connected through spicytrade, which needs the agent token to mint', `Sign in with: ${cliCommand('login')}`)
   } else {
     const described = credential.kind === 'app' ? 'tastytrade connection' : 'tastytrade personal grant'
     try {
@@ -128,7 +128,7 @@ export async function doctor(out = process.stdout) {
     } catch (error) {
       // A refused agent token fails the app-grant mint too; signing in again fixes both.
       checks.fail(`${described}: ${brokerFailure(error, credential.kind)}`,
-        error instanceof TastytradeAuthError && error.code === 'spicy-trade-401'
+        error instanceof TastytradeAuthError && error.code === 'spicytrade-401'
           ? `Sign in again with: ${cliCommand('login')}`
           : credential.kind === 'app'
             ? `Reconnect with: ${cliCommand('connect-tastytrade')}`
@@ -170,7 +170,7 @@ export async function doctor(out = process.stdout) {
       checks.pass(`${client.name} points at the proxy`)
     }
     const legacy = client.configured(LEGACY_MCP_SERVER_NAME)
-    if (legacy.state === 'configured' && namesSpicyTrade(legacy.url)) {
+    if (legacy.state === 'configured' && namesSpicytrade(legacy.url)) {
       checks.fail(`${client.name} still has the old ${LEGACY_MCP_SERVER_NAME} entry`, `Replace it with: ${setup}`)
     }
   }

@@ -355,26 +355,26 @@ function RunwayEmpty({
   const [heading, detail] = searching
     ? [
         'Looking for what’s coming.',
-        ` Nothing is on ${symbol}'s calendar yet, so spicy.trade is searching for scheduled ${CATALYST_SCOPE} dates.`,
+        ` Nothing is on ${symbol}'s calendar yet, so spicytrade is searching for scheduled ${CATALYST_SCOPE} dates.`,
       ]
     : failed
     ? [
         'The calendar search didn’t finish.',
-        ` spicy.trade couldn't search for ${symbol}'s scheduled ${CATALYST_SCOPE} dates just now, so this calendar is unknown rather than empty.`,
+        ` spicytrade couldn't search for ${symbol}'s scheduled ${CATALYST_SCOPE} dates just now, so this calendar is unknown rather than empty.`,
       ]
     : readFailed
     ? [
         'The calendar didn’t load.',
-        ` spicy.trade couldn't read ${symbol}'s ${CATALYST_SCOPE} dates just now, so this calendar is unknown rather than empty.`,
+        ` spicytrade couldn't read ${symbol}'s ${CATALYST_SCOPE} dates just now, so this calendar is unknown rather than empty.`,
       ]
     : confirmedEmpty
     ? [
         'Searched — nothing scheduled.',
-        ` spicy.trade just searched for ${symbol}'s ${CATALYST_SCOPE} dates and found none. A re-rating from here would have to come from something unannounced.`,
+        ` spicytrade just searched for ${symbol}'s ${CATALYST_SCOPE} dates and found none. A re-rating from here would have to come from something unannounced.`,
       ]
     : [
         'Nothing is on the calendar.',
-        ` spicy.trade tracks ${CATALYST_SCOPE} dates for ${symbol} and has none on file.`,
+        ` spicytrade tracks ${CATALYST_SCOPE} dates for ${symbol} and has none on file.`,
       ]
   return (
     <div className="runway-empty" aria-live="polite">
@@ -464,7 +464,7 @@ function CatalystRunway({
               )}
               {readFailed && (
                 <p className="runway-searching" aria-live="polite">
-                  {symbol}’s full calendar didn’t load; these are the dates spicy.trade already had.
+                  {symbol}’s full calendar didn’t load; these are the dates spicytrade already had.
                 </p>
               )}
             </>

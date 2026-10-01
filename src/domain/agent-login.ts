@@ -4,7 +4,7 @@ import { MAX_LOOPBACK_PORT, MIN_LOOPBACK_PORT } from './broker-authorization'
 import { McpTokenLabelSchema } from './mcp-tokens'
 
 /**
- * The browser sign-in for a member's terminal: the wire contract between `spicy-trade login` on
+ * The browser sign-in for a member's terminal: the wire contract between `spicytrade login` on
  * the member's machine, the `/connect/agent` approval page, and the Worker's
  * `/api/agent-logins*` endpoints.
  *

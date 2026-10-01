@@ -90,7 +90,7 @@ export function createWatchlistReadTool(env: AppEnv): AgentTool<typeof Watchlist
  */
 export function createWatchlistIndexTool(env: AppEnv): AgentTool<typeof WatchlistIndexParameters> {
   return {
-    description: 'Every symbol spicy.trade keeps loaded, alphabetized.',
+    description: 'Every symbol spicytrade keeps loaded, alphabetized.',
     execute: async () => textResult(indexResult((await loadStoredPublicMarketUniverse(env)).symbols)),
     name: 'read_watchlist',
     parameters: WatchlistIndexParameters,

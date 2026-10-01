@@ -13,7 +13,7 @@ import { CliFailure } from './loopback.mjs'
  * notice a unit left pointing at a checkout or a node version that has since moved.
  */
 
-const TEMPLATE_URL = new URL('./systemd/spicy-trade-proxy.service', import.meta.url)
+const TEMPLATE_URL = new URL('./systemd/spicytrade-proxy.service', import.meta.url)
 
 export function unitPath(name = UNIT_NAME) {
   return join(process.env.XDG_CONFIG_HOME || join(homedir(), '.config'), 'systemd', 'user', name)

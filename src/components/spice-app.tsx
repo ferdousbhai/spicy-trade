@@ -59,7 +59,7 @@ function useWorkspace(): Workspace {
   const workspace = useContext(WorkspaceContext)
   // A view rendered outside the layout has no market to read; saying so beats rendering an
   // empty market as if it were real.
-  if (!workspace) throw new Error('A spicy.trade view rendered outside the application layout.')
+  if (!workspace) throw new Error('A spicytrade view rendered outside the application layout.')
   return workspace
 }
 
@@ -353,7 +353,7 @@ function SnapshotUnavailable() {
       <Empty>
         <EmptyHeader>
           <h2 className="market-state-title">Market data is unavailable</h2>
-          <EmptyDescription>spicy.trade couldn&apos;t load the market snapshot.</EmptyDescription>
+          <EmptyDescription>spicytrade couldn&apos;t load the market snapshot.</EmptyDescription>
         </EmptyHeader>
         <Button onClick={() => window.location.reload()} size="sm" type="button" variant="outline">Try again</Button>
       </Empty>

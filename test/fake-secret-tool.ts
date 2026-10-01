@@ -11,9 +11,9 @@ import { join } from 'node:path'
  * "not stored" -- never a stored value and never a false positive. `store` reads the value from
  * stdin, exactly as `keyringStore` sends it, and lands it in the same `store/` directory a
  * caller can read back to assert what was persisted. `clear` removes an entry, as the credential
- * script does with a token spicy.trade refused.
+ * script does with a token spicytrade refused.
  *
- * Keyed by `service/key` rather than key alone, because the service is what separates spicy.trade's
+ * Keyed by `service/key` rather than key alone, because the service is what separates spicytrade's
  * own token from a broker's credentials, and a stand-in that collapsed them could not notice
  * them being confused.
  */

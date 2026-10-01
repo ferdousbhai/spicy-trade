@@ -5,7 +5,7 @@ import { MCP_PATH } from '../domain/site'
 /**
  * The JSON-RPC answer for an MCP client that connected to the wrong path.
  *
- * People are told to point their agent at spicy.trade, and the natural thing to type is the site's
+ * People are told to point their agent at spicytrade, and the natural thing to type is the site's
  * own address rather than the endpoint under it. That request lands on the web app, which
  * answers `200 text/html`, and the client fails somewhere inside its JSON parser — the one
  * failure mode that tells the user nothing at all. A JSON-RPC error naming the endpoint is
@@ -29,7 +29,7 @@ export async function mcpEndpointRedirect(request: Request): Promise<Response | 
   return Response.json({
     error: {
       code: -32_600,
-      message: `spicy.trade's MCP endpoint is ${endpoint} — this address serves the web app. Reconnect to ${endpoint}.`,
+      message: `spicytrade's MCP endpoint is ${endpoint} — this address serves the web app. Reconnect to ${endpoint}.`,
     },
     id: null,
     jsonrpc: '2.0',

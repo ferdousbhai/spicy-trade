@@ -5,7 +5,7 @@ import { TOKEN_REQUEST_TIMEOUT_MS } from './token-refresh.mjs'
 
 /**
  * Minting a 15-minute tastytrade access token from the long-lived grant in the keyring, for the
- * proxy that attaches it and for `spicy-trade doctor` that checks the grant still mints. Its own
+ * proxy that attaches it and for `spicytrade doctor` that checks the grant still mints. Its own
  * module because importing `proxy.mjs` starts the proxy.
  */
 
@@ -28,13 +28,13 @@ const APP_GRANT_TOKEN_URL = new URL('/api/brokers/tastytrade/token', ORIGIN)
 
 /**
  * A refused, unreachable, or unreadable token exchange. Its `code` is tastytrade's HTTP status, a
- * fixed word of ours, or `spicy-trade-` and the Worker's status when the Worker refused an app-grant
+ * fixed word of ours, or `spicytrade-` and the Worker's status when the Worker refused an app-grant
  * mint itself, and the handler logs it beside the name: a revoked grant or an unreachable broker
  * has to read as that in the log, not as a bare `Error` or `TypeError` indistinguishable from the
  * Worker failing. `transport`, when present, is the OS- or undici-level code of the failure --
  * `ENOTFOUND`, `TimeoutError` -- never a message. Nothing here carries the request or response
  * body, either of which can hold credential material. `party` is who could not be reached when
- * the code is `unreachable`: tastytrade for a personal grant, spicy.trade for an app grant, which
+ * the code is `unreachable`: tastytrade for a personal grant, spicytrade for an app grant, which
  * is what the member is told to go and check.
  */
 export class TastytradeAuthError extends Error {
@@ -68,7 +68,7 @@ export async function mintPersonalGrant(clientSecret, refreshToken) {
       headers: {
         Accept: 'application/json',
         'Content-Type': 'application/json',
-        'User-Agent': 'SpicyTrade-Proxy/0.1',
+        'User-Agent': 'Spicytrade-Proxy/0.1',
       },
       method: 'POST',
       signal: AbortSignal.timeout(TOKEN_REQUEST_TIMEOUT_MS),
@@ -96,11 +96,11 @@ export async function mintPersonalGrant(clientSecret, refreshToken) {
 
 /**
  * An app grant: the member's refresh token, minted by the Worker, which adds the app's client
- * secret. The refresh token leaves this machine only in this request's body, to spicy.trade, over the
+ * secret. The refresh token leaves this machine only in this request's body, to spicytrade, over the
  * same authenticated channel every forwarded call uses.
  *
  * A refusal is reported by tastytrade's status when the Worker relays one, so a revoked grant
- * reads the same in this log whichever kind it is; a refusal of the Worker's own is `spicy-trade-`
+ * reads the same in this log whichever kind it is; a refusal of the Worker's own is `spicytrade-`
  * and its status.
  */
 export async function mintAppGrant(agentBearer, refreshToken) {
@@ -112,23 +112,23 @@ export async function mintAppGrant(agentBearer, refreshToken) {
         Accept: 'application/json',
         Authorization: `Bearer ${agentBearer}`,
         'Content-Type': 'application/json',
-        'User-Agent': 'SpicyTrade-Proxy/0.1',
+        'User-Agent': 'Spicytrade-Proxy/0.1',
       },
       method: 'POST',
       signal: AbortSignal.timeout(TOKEN_REQUEST_TIMEOUT_MS),
     })
   } catch (error) {
-    throw new TastytradeAuthError('unreachable', transportCode(error), 'spicy.trade')
+    throw new TastytradeAuthError('unreachable', transportCode(error), 'spicytrade')
   }
   let payload
   try {
     payload = await response.json()
   } catch {
-    throw new TastytradeAuthError(response.ok ? 'invalid-token-response' : `spicy-trade-${response.status}`)
+    throw new TastytradeAuthError(response.ok ? 'invalid-token-response' : `spicytrade-${response.status}`)
   }
   if (!response.ok) {
     const refusal = AppGrantRefusalSchema.safeParse(payload)
-    throw new TastytradeAuthError(refusal.success ? refusal.data.tastytradeStatus : `spicy-trade-${response.status}`)
+    throw new TastytradeAuthError(refusal.success ? refusal.data.tastytradeStatus : `spicytrade-${response.status}`)
   }
   const grant = AppGrantResponseSchema.safeParse(payload)
   if (!grant.success) throw new TastytradeAuthError('invalid-token-response')

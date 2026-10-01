@@ -34,7 +34,7 @@ export function SitePage({
         <div className="site-prose">{children}</div>
       </main>
       <footer className="site-footer">
-        <span>© 2026 spicy.trade</span>
+        <span>© 2026 spicytrade</span>
         <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>
       </footer>
     </div>

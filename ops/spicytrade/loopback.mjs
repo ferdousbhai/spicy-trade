@@ -5,8 +5,8 @@ import { createServer } from 'node:http'
 import { LISTEN_HOST } from './config.mjs'
 
 /**
- * The browser round trip both sign-ins share: `spicy-trade login` (spicy.trade approves this
- * machine) and `connect-tastytrade` (tastytrade approves spicy.trade). The member approves in a
+ * The browser round trip both sign-ins share: `spicytrade login` (spicytrade approves this
+ * machine) and `connect-tastytrade` (tastytrade approves spicytrade). The member approves in a
  * browser, and the browser is sent back to a one-shot listener here on the loopback address with
  * a code and the state this run chose or was given.
  */

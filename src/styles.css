@@ -8,7 +8,7 @@
 
 /*
  * Stocks-inspired reading hierarchy across phone and desktop: system UI text, tabular
- * prices, neutral separators, and spicy.trade's amber accent. These type and spacing tokens
+ * prices, neutral separators, and spicytrade's amber accent. These type and spacing tokens
  * are the product scale; code samples alone retain the terminal font.
  */
 :root {
@@ -27,7 +27,7 @@
   /* Not `--accent`: the shadcn theme below owns that name for its grey hover surface, and its
      `.dark` block on <html> would repaint every amber rule grey. */
   --brand: #ffab4a;
-  /* The wordmark's `.trade`, in the pepper's own red from spice-mark.svg. */
+  /* The wordmark's `trade`, in the pepper's own red from spice-mark.svg. */
   --pepper: #ee2c3c;
   --cheap: #a9e04b;
   --fair-tone: #e8c455;
@@ -499,7 +499,7 @@ body { font-size: var(--type-body); min-width: 320px; min-height: 100vh; min-hei
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
-/* The shadcn names read spicy.trade's tokens wherever the two agree, so a colour is set once. `--accent`
+/* The shadcn names read spicytrade's tokens wherever the two agree, so a colour is set once. `--accent`
    is shadcn's hover surface, not the brand: it only has to stand clear of the popover. */
 .dark {
   --background: var(--bg);

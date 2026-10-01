@@ -1,6 +1,6 @@
 import { createInterface } from 'node:readline/promises'
 
-import { CLIENTS, namesSpicyTrade } from './clients.mjs'
+import { CLIENTS, namesSpicytrade } from './clients.mjs'
 import {
   AGENT_TOKEN_SERVICE, cliCommand, LEGACY_AGENT_TOKEN_SERVICE, LEGACY_MCP_SERVER_NAME, LEGACY_UNIT_NAME, MCP_SERVER_NAME,
   MCP_TOKEN_KEY, PROXY_URL,
@@ -16,8 +16,8 @@ import { connectTastytrade } from './tastytrade-connect.mjs'
 import { checkAgentToken, describeTokenCheck } from './worker.mjs'
 
 /**
- * `spicy-trade setup`: everything between a fresh machine and an agent that can reach
- * spicy.trade, in one run. Each step looks before it acts and skips what is already done, so
+ * `spicytrade setup`: everything between a fresh machine and an agent that can reach
+ * spicytrade, in one run. Each step looks before it acts and skips what is already done, so
  * running it again is also how a broken setup is repaired; `doctor` closes the run by checking
  * the result end to end.
  *
@@ -26,7 +26,7 @@ import { checkAgentToken, describeTokenCheck } from './worker.mjs'
  * ask on leaves it undone and says how to do it later.
  */
 
-const PROGRAM = 'SpicyTradeSetup'
+const PROGRAM = 'SpicytradeSetup'
 
 function step(out, title) {
   out.write(`\n== ${title}\n`)
@@ -44,13 +44,13 @@ async function confirm(question) {
 /**
  * The entry an install from before the rename added, under the old name. It is removed only once
  * the current entry is in place, so a client is never left with neither, and only when it names
- * the proxy or spicy.trade: an entry of that name pointing anywhere else is someone's own.
+ * the proxy or spicytrade: an entry of that name pointing anywhere else is someone's own.
  */
 function replaceLegacyEntry(out, client, inPlace) {
   const legacy = client.configured(LEGACY_MCP_SERVER_NAME)
   if (legacy.state !== 'configured') return
-  if (!namesSpicyTrade(legacy.url)) {
-    out.write(`! ${client.name} has a ${LEGACY_MCP_SERVER_NAME} server that is not spicy.trade's; left as it is\n`)
+  if (!namesSpicytrade(legacy.url)) {
+    out.write(`! ${client.name} has a ${LEGACY_MCP_SERVER_NAME} server that is not spicytrade's; left as it is\n`)
   } else if (!inPlace) {
     out.write(`· ${client.name} keeps its old ${LEGACY_MCP_SERVER_NAME} entry until ${MCP_SERVER_NAME} is in place\n`)
   } else if (client.remove(LEGACY_MCP_SERVER_NAME).ok) {
@@ -76,7 +76,7 @@ export async function setup(out = process.stdout) {
   // A proxy that was already running keeps whatever credentials it read when it started.
   let credentialsChanged = false
 
-  step(out, 'spicy.trade sign-in')
+  step(out, 'spicytrade sign-in')
   const token = await agentToken(PROGRAM)
   const check = token ? await checkAgentToken(token) : undefined
   if (check?.status === 'accepted') {
@@ -91,7 +91,7 @@ export async function setup(out = process.stdout) {
       out.write(`✓ already signed in; moved the token from ${LEGACY_AGENT_TOKEN_SERVICE}/${MCP_TOKEN_KEY} to ${AGENT_TOKEN_SERVICE}/${MCP_TOKEN_KEY}\n`)
     }
   } else if (check?.status === 'unanswered' || check?.status === 'unreachable') {
-    throw new CliFailure(`${describeTokenCheck(check)}. Run this again once spicy.trade answers.`)
+    throw new CliFailure(`${describeTokenCheck(check)}. Run this again once spicytrade answers.`)
   } else {
     if (check?.status === 'rejected') out.write('The stored agent token was rejected; signing in again.\n')
     await login(out, { restartProxy: false })

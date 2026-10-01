@@ -7,7 +7,7 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { z } from 'zod'
 
-import { tokenRetiresAt, UPSTREAM_TIMEOUT_MS } from '../ops/spicy-trade/token-refresh.mjs'
+import { tokenRetiresAt, UPSTREAM_TIMEOUT_MS } from '../ops/spicytrade/token-refresh.mjs'
 import { fakeSecretTool } from './fake-secret-tool.ts'
 
 const REFRESH_TOKEN = 'refresh-token-that-must-never-leave-this-machine'
@@ -50,14 +50,14 @@ async function fakeKeyring(entries: Record<string, string>): Promise<string> {
 }
 
 async function startProxy(env: Record<string, string>, port: number): Promise<void> {
-  proxy = spawn(process.execPath, ['ops/spicy-trade/proxy.mjs'], {
-    env: { ...process.env, ...env, SPICY_TRADE_PROXY_PORT: String(port) },
+  proxy = spawn(process.execPath, ['ops/spicytrade/proxy.mjs'], {
+    env: { ...process.env, ...env, SPICYTRADE_PROXY_PORT: String(port) },
     stdio: ['ignore', 'pipe', 'pipe'],
   })
   await new Promise<void>((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error('proxy did not start')), 10_000)
     proxy!.stdout?.on('data', (chunk: Buffer) => {
-      if (chunk.toString().includes('SpicyTradeProxy: http://')) {
+      if (chunk.toString().includes('SpicytradeProxy: http://')) {
         clearTimeout(timer)
         resolve()
       }
@@ -87,14 +87,14 @@ describe('local agent proxy', () => {
       })
     })
     const keyring = await fakeKeyring({
-      'spicy-trade/mcp-token': AGENT_TOKEN,
+      'spicytrade/mcp-token': AGENT_TOKEN,
       'tastytrade/client-secret': CLIENT_SECRET,
       'tastytrade/refresh-token': REFRESH_TOKEN,
     })
     const proxyPort = 18_787
     await startProxy({
       PATH: `${keyring}:${process.env.PATH ?? ''}`,
-      SPICY_TRADE_MCP_URL: `http://127.0.0.1:${port}/mcp`,
+      SPICYTRADE_MCP_URL: `http://127.0.0.1:${port}/mcp`,
       TASTYTRADE_API_BASE: `http://127.0.0.1:${port}`,
     }, proxyPort)
 
@@ -131,11 +131,11 @@ describe('local agent proxy', () => {
         response.end(JSON.stringify({ ok: true }))
       })
     })
-    const keyring = await fakeKeyring({ 'spicy-trade/mcp-token': AGENT_TOKEN })
+    const keyring = await fakeKeyring({ 'spicytrade/mcp-token': AGENT_TOKEN })
     const proxyPort = 18_788
     await startProxy({
       PATH: `${keyring}:${process.env.PATH ?? ''}`,
-      SPICY_TRADE_MCP_URL: `http://127.0.0.1:${port}/mcp`,
+      SPICYTRADE_MCP_URL: `http://127.0.0.1:${port}/mcp`,
       TASTYTRADE_API_BASE: `http://127.0.0.1:${port}`,
     }, proxyPort)
 
@@ -162,21 +162,21 @@ describe('local agent proxy', () => {
         response.end(JSON.stringify({ ok: true }))
       })
     })
-    const keyring = await fakeKeyring({ 'spice/mcp-token': AGENT_TOKEN })
+    const keyring = await fakeKeyring({ 'spicy-trade/mcp-token': AGENT_TOKEN })
     const proxyPort = 18_798
-    proxy = spawn(process.execPath, ['ops/spicy-trade/proxy.mjs'], {
+    proxy = spawn(process.execPath, ['ops/spicytrade/proxy.mjs'], {
       env: {
         ...process.env,
         PATH: `${keyring}:${process.env.PATH ?? ''}`,
-        SPICE_AGENT_PORT: String(proxyPort),
-        SPICE_MCP_URL: `http://127.0.0.1:${port}/mcp`,
+        SPICYTRADE_PROXY_PORT: String(proxyPort),
+        SPICYTRADE_MCP_URL: `http://127.0.0.1:${port}/mcp`,
       },
       stdio: ['ignore', 'pipe', 'pipe'],
     })
     await new Promise<void>((resolve, reject) => {
       const timer = setTimeout(() => reject(new Error('proxy did not start')), 10_000)
       proxy!.stdout?.on('data', (chunk: Buffer) => {
-        if (chunk.toString().includes('SpicyTradeProxy: http://')) {
+        if (chunk.toString().includes('SpicytradeProxy: http://')) {
           clearTimeout(timer)
           resolve()
         }
@@ -207,11 +207,11 @@ describe('local agent proxy', () => {
         response.end(JSON.stringify({ ok: true }))
       })
     })
-    const keyring = await fakeKeyring({ 'spicy-trade/mcp-token': AGENT_TOKEN })
+    const keyring = await fakeKeyring({ 'spicytrade/mcp-token': AGENT_TOKEN })
     const proxyPort = 18_789
     await startProxy({
       PATH: `${keyring}:${process.env.PATH ?? ''}`,
-      SPICY_TRADE_MCP_URL: `http://127.0.0.1:${port}/mcp`,
+      SPICYTRADE_MCP_URL: `http://127.0.0.1:${port}/mcp`,
       TASTYTRADE_API_BASE: `http://127.0.0.1:${port}`,
     }, proxyPort)
 
@@ -251,14 +251,14 @@ describe('local agent proxy', () => {
       })
     })
     const keyring = await fakeKeyring({
-      'spicy-trade/mcp-token': AGENT_TOKEN,
+      'spicytrade/mcp-token': AGENT_TOKEN,
       'tastytrade/client-secret': CLIENT_SECRET,
       'tastytrade/refresh-token': REFRESH_TOKEN,
     })
     const proxyPort = 18_790
     await startProxy({
       PATH: `${keyring}:${process.env.PATH ?? ''}`,
-      SPICY_TRADE_MCP_URL: `http://127.0.0.1:${port}/mcp`,
+      SPICYTRADE_MCP_URL: `http://127.0.0.1:${port}/mcp`,
       TASTYTRADE_API_BASE: `http://127.0.0.1:${port}`,
     }, proxyPort)
 
@@ -297,11 +297,11 @@ describe('local agent proxy', () => {
         setTimeout(() => response.destroy(), 50)
       })
     })
-    const keyring = await fakeKeyring({ 'spicy-trade/mcp-token': AGENT_TOKEN })
+    const keyring = await fakeKeyring({ 'spicytrade/mcp-token': AGENT_TOKEN })
     const proxyPort = 18_792
     await startProxy({
       PATH: `${keyring}:${process.env.PATH ?? ''}`,
-      SPICY_TRADE_MCP_URL: `http://127.0.0.1:${port}/mcp`,
+      SPICYTRADE_MCP_URL: `http://127.0.0.1:${port}/mcp`,
       TASTYTRADE_API_BASE: `http://127.0.0.1:${port}`,
     }, proxyPort)
 
@@ -343,14 +343,14 @@ describe('local agent proxy', () => {
       })
     })
     const keyring = await fakeKeyring({
-      'spicy-trade/mcp-token': AGENT_TOKEN,
+      'spicytrade/mcp-token': AGENT_TOKEN,
       'tastytrade/client-secret': CLIENT_SECRET,
       'tastytrade/refresh-token': REFRESH_TOKEN,
     })
     const proxyPort = 18_793
     await startProxy({
       PATH: `${keyring}:${process.env.PATH ?? ''}`,
-      SPICY_TRADE_MCP_URL: `http://127.0.0.1:${port}/mcp`,
+      SPICYTRADE_MCP_URL: `http://127.0.0.1:${port}/mcp`,
       TASTYTRADE_API_BASE: `http://127.0.0.1:${port}`,
     }, proxyPort)
     let stderr = ''
@@ -362,7 +362,7 @@ describe('local agent proxy', () => {
       method: 'POST',
     })
     expect(reply.status).toBe(502)
-    await expect.poll(() => stderr).toContain('SpicyTradeProxy: POST TastytradeAuth 401\n')
+    await expect.poll(() => stderr).toContain('SpicytradeProxy: POST TastytradeAuth 401\n')
     expect(stderr).not.toContain(REFRESH_TOKEN)
     expect(stderr).not.toContain(CLIENT_SECRET)
     expect(forwarded).toBe(0)
@@ -391,14 +391,14 @@ describe('local agent proxy', () => {
       })
     })
     const keyring = await fakeKeyring({
-      'spicy-trade/mcp-token': AGENT_TOKEN,
+      'spicytrade/mcp-token': AGENT_TOKEN,
       'tastytrade/client-secret': CLIENT_SECRET,
       'tastytrade/refresh-token': REFRESH_TOKEN,
     })
     const proxyPort = 18_794
     await startProxy({
       PATH: `${keyring}:${process.env.PATH ?? ''}`,
-      SPICY_TRADE_MCP_URL: `http://127.0.0.1:${port}/mcp`,
+      SPICYTRADE_MCP_URL: `http://127.0.0.1:${port}/mcp`,
       TASTYTRADE_API_BASE: `http://127.0.0.1:${port}`,
     }, proxyPort)
     let stderr = ''
@@ -410,11 +410,11 @@ describe('local agent proxy', () => {
     })
 
     expect((await call()).status).toBe(502)
-    await expect.poll(() => stderr).toContain('SpicyTradeProxy: POST TastytradeAuth invalid-token-response\n')
+    await expect.poll(() => stderr).toContain('SpicytradeProxy: POST TastytradeAuth invalid-token-response\n')
 
     tokenAnswer = 'refuse'
     expect((await call()).status).toBe(502)
-    await expect.poll(() => stderr).toMatch(/SpicyTradeProxy: POST TastytradeAuth unreachable( [A-Za-z0-9_]+)?\n/)
+    await expect.poll(() => stderr).toMatch(/SpicytradeProxy: POST TastytradeAuth unreachable( [A-Za-z0-9_]+)?\n/)
     expect(stderr).not.toContain('TypeError')
     expect(stderr).not.toContain('SyntaxError')
     expect(stderr).not.toContain(REFRESH_TOKEN)
@@ -423,17 +423,17 @@ describe('local agent proxy', () => {
   }, 30_000)
 
   it('exits non-zero when the keyring cannot be read rather than starting market-only', async () => {
-    const directory = await mkdtemp(join(tmpdir(), 'spicy-trade-keyring-'))
+    const directory = await mkdtemp(join(tmpdir(), 'spicytrade-keyring-'))
     keyrings.push(directory)
     await writeFile(join(directory, 'secret-tool'), `#!/usr/bin/env bash
 case "$3/$5" in
-  spicy-trade/mcp-token) printf '%s' '${AGENT_TOKEN}' ;;
+  spicytrade/mcp-token) printf '%s' '${AGENT_TOKEN}' ;;
   *) echo 'Cannot create an item in a locked collection' >&2; exit 1 ;;
 esac
 `)
     await chmod(join(directory, 'secret-tool'), 0o755)
-    const child = spawn(process.execPath, ['ops/spicy-trade/proxy.mjs'], {
-      env: { ...process.env, SPICY_TRADE_PROXY_PORT: '18791', PATH: `${directory}:${process.env.PATH ?? ''}` },
+    const child = spawn(process.execPath, ['ops/spicytrade/proxy.mjs'], {
+      env: { ...process.env, SPICYTRADE_PROXY_PORT: '18791', PATH: `${directory}:${process.env.PATH ?? ''}` },
       stdio: ['ignore', 'pipe', 'pipe'],
     })
     proxy = child
@@ -441,7 +441,7 @@ esac
     child.stdout?.on('data', (chunk: Buffer) => { stdout += chunk.toString() })
     const code = await new Promise<number | null>((resolve) => child.on('exit', resolve))
     expect(code).not.toBe(0)
-    expect(stdout).not.toContain('SpicyTradeProxy: http://')
+    expect(stdout).not.toContain('SpicytradeProxy: http://')
   }, 30_000)
 
   it('mints an app grant through the Worker and forwards only the access token', async () => {
@@ -472,13 +472,13 @@ esac
       })
     })
     const keyring = await fakeKeyring({
-      'spicy-trade/mcp-token': AGENT_TOKEN,
+      'spicytrade/mcp-token': AGENT_TOKEN,
       'tastytrade/app-refresh-token': REFRESH_TOKEN,
     })
     const proxyPort = 18_795
     await startProxy({
       PATH: `${keyring}:${process.env.PATH ?? ''}`,
-      SPICY_TRADE_MCP_URL: `http://127.0.0.1:${port}/mcp`,
+      SPICYTRADE_MCP_URL: `http://127.0.0.1:${port}/mcp`,
       TASTYTRADE_API_BASE: `http://127.0.0.1:${port}`,
     }, proxyPort)
 
@@ -519,13 +519,13 @@ esac
       })
     })
     const keyring = await fakeKeyring({
-      'spicy-trade/mcp-token': AGENT_TOKEN,
+      'spicytrade/mcp-token': AGENT_TOKEN,
       'tastytrade/app-refresh-token': REFRESH_TOKEN,
     })
     const proxyPort = 18_796
     await startProxy({
       PATH: `${keyring}:${process.env.PATH ?? ''}`,
-      SPICY_TRADE_MCP_URL: `http://127.0.0.1:${port}/mcp`,
+      SPICYTRADE_MCP_URL: `http://127.0.0.1:${port}/mcp`,
     }, proxyPort)
     let stderr = ''
     proxy!.stderr?.on('data', (chunk: Buffer) => { stderr += chunk.toString() })
@@ -536,7 +536,7 @@ esac
       method: 'POST',
     })
     expect(reply.status).toBe(502)
-    await expect.poll(() => stderr).toContain('SpicyTradeProxy: POST TastytradeAuth 401\n')
+    await expect.poll(() => stderr).toContain('SpicytradeProxy: POST TastytradeAuth 401\n')
     expect(stderr).not.toContain(REFRESH_TOKEN)
     expect(forwarded).toBe(0)
   }, 30_000)
@@ -549,12 +549,12 @@ esac
     ]
     for (const personal of personalGrants) {
       const keyring = await fakeKeyring({
-        'spicy-trade/mcp-token': AGENT_TOKEN,
+        'spicytrade/mcp-token': AGENT_TOKEN,
         'tastytrade/app-refresh-token': 'app-refresh-token-value',
         ...personal,
       })
-      const child = spawn(process.execPath, ['ops/spicy-trade/proxy.mjs'], {
-        env: { ...process.env, SPICY_TRADE_PROXY_PORT: '18797', PATH: `${keyring}:${process.env.PATH ?? ''}` },
+      const child = spawn(process.execPath, ['ops/spicytrade/proxy.mjs'], {
+        env: { ...process.env, SPICYTRADE_PROXY_PORT: '18797', PATH: `${keyring}:${process.env.PATH ?? ''}` },
         stdio: ['ignore', 'pipe', 'pipe'],
       })
       proxy = child
@@ -564,7 +564,7 @@ esac
       child.stderr?.on('data', (chunk: Buffer) => { stderr += chunk.toString() })
       const code = await new Promise<number | null>((resolve) => child.on('exit', resolve))
       expect(code).not.toBe(0)
-      expect(stdout).not.toContain('SpicyTradeProxy: http://')
+      expect(stdout).not.toContain('SpicytradeProxy: http://')
       expect(stderr).toContain('the keyring holds both a tastytrade app grant')
       expect(stderr).not.toContain(CLIENT_SECRET)
       expect(stderr).not.toContain('app-refresh-token-value')
@@ -619,9 +619,9 @@ describe('local agent proxy failures an agent can act on', () => {
         response.end(JSON.stringify({ error: 'invalid_token' }))
       })
     })
-    const keyring = await fakeKeyring({ 'spicy-trade/mcp-token': AGENT_TOKEN })
+    const keyring = await fakeKeyring({ 'spicytrade/mcp-token': AGENT_TOKEN })
     const proxyPort = 18_801
-    await startProxy({ PATH: `${keyring}:${process.env.PATH ?? ''}`, SPICY_TRADE_MCP_URL: `http://127.0.0.1:${port}/mcp` }, proxyPort)
+    await startProxy({ PATH: `${keyring}:${process.env.PATH ?? ''}`, SPICYTRADE_MCP_URL: `http://127.0.0.1:${port}/mcp` }, proxyPort)
     let stderr = ''
     proxy!.stderr?.on('data', (chunk: Buffer) => { stderr += chunk.toString() })
 
@@ -631,8 +631,8 @@ describe('local agent proxy failures an agent can act on', () => {
     expect(failure.jsonrpc).toBe('2.0')
     expect(failure.id).toBe(7)
     expect(failure.error.code).toBe(-32001)
-    expect(failure.error.message).toMatch(/^spicy\.trade rejected the agent token in this machine's keyring\. Run: \S*spicy-trade(\.mjs)? login$/)
-    await expect.poll(() => stderr).toContain('SpicyTradeProxy: POST AgentTokenRefused 401\n')
+    expect(failure.error.message).toMatch(/^spicytrade rejected the agent token in this machine's keyring\. Run: \S*spicytrade(\.mjs)? login$/)
+    await expect.poll(() => stderr).toContain('SpicytradeProxy: POST AgentTokenRefused 401\n')
     expect(JSON.stringify(failure)).not.toContain(AGENT_TOKEN)
     expect(stderr).not.toContain(AGENT_TOKEN)
   }, 30_000)
@@ -647,11 +647,11 @@ describe('local agent proxy failures an agent can act on', () => {
       })
     })
     const keyring = await fakeKeyring({
-      'spicy-trade/mcp-token': AGENT_TOKEN,
+      'spicytrade/mcp-token': AGENT_TOKEN,
       'tastytrade/app-refresh-token': REFRESH_TOKEN,
     })
     const proxyPort = 18_802
-    await startProxy({ PATH: `${keyring}:${process.env.PATH ?? ''}`, SPICY_TRADE_MCP_URL: `http://127.0.0.1:${port}/mcp` }, proxyPort)
+    await startProxy({ PATH: `${keyring}:${process.env.PATH ?? ''}`, SPICYTRADE_MCP_URL: `http://127.0.0.1:${port}/mcp` }, proxyPort)
 
     // The Worker refused the agent token on the mint itself.
     refusal = { body: { error: 'Unauthorized' }, status: 401 }
@@ -667,7 +667,7 @@ describe('local agent proxy failures an agent can act on', () => {
     expect(grantRefused.status).toBe(502)
     expect(grantRefused.failure.id).toBeNull()
     expect(grantRefused.failure.error.code).toBe(-32002)
-    expect(grantRefused.failure.error.message).toMatch(/^tastytrade refused this machine's brokerage connection \(HTTP 401\)\. Reconnect with: \S*spicy-trade(\.mjs)? connect-tastytrade$/)
+    expect(grantRefused.failure.error.message).toMatch(/^tastytrade refused this machine's brokerage connection \(HTTP 401\)\. Reconnect with: \S*spicytrade(\.mjs)? connect-tastytrade$/)
     expect(JSON.stringify(grantRefused.failure)).not.toContain(REFRESH_TOKEN)
   }, 30_000)
 
@@ -680,14 +680,14 @@ describe('local agent proxy failures an agent can act on', () => {
       })
     })
     const keyring = await fakeKeyring({
-      'spicy-trade/mcp-token': AGENT_TOKEN,
+      'spicytrade/mcp-token': AGENT_TOKEN,
       'tastytrade/client-secret': CLIENT_SECRET,
       'tastytrade/refresh-token': REFRESH_TOKEN,
     })
     const proxyPort = 18_803
     await startProxy({
       PATH: `${keyring}:${process.env.PATH ?? ''}`,
-      SPICY_TRADE_MCP_URL: `http://127.0.0.1:${port}/mcp`,
+      SPICYTRADE_MCP_URL: `http://127.0.0.1:${port}/mcp`,
       TASTYTRADE_API_BASE: `http://127.0.0.1:${port}`,
     }, proxyPort)
 
@@ -702,13 +702,13 @@ describe('local agent proxy failures an agent can act on', () => {
     const port = await listen(() => {})
     await new Promise<void>((resolve) => upstream!.close(() => resolve()))
     upstream = undefined
-    const keyring = await fakeKeyring({ 'spicy-trade/mcp-token': AGENT_TOKEN })
+    const keyring = await fakeKeyring({ 'spicytrade/mcp-token': AGENT_TOKEN })
     const proxyPort = 18_804
-    await startProxy({ PATH: `${keyring}:${process.env.PATH ?? ''}`, SPICY_TRADE_MCP_URL: `http://127.0.0.1:${port}/mcp` }, proxyPort)
+    await startProxy({ PATH: `${keyring}:${process.env.PATH ?? ''}`, SPICYTRADE_MCP_URL: `http://127.0.0.1:${port}/mcp` }, proxyPort)
 
     const { failure, status } = await failingCall(proxyPort, { id: 1, jsonrpc: '2.0', method: 'tools/list' })
     expect(status).toBe(502)
     expect(failure.error.code).toBe(-32003)
-    expect(failure.error.message).toMatch(/^spicy\.trade could not be reached from this machine \(ECONNREFUSED\)\. .* doctor$/)
+    expect(failure.error.message).toMatch(/^spicytrade could not be reached from this machine \(ECONNREFUSED\)\. .* doctor$/)
   }, 30_000)
 })

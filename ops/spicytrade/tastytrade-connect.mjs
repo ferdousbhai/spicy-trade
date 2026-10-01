@@ -10,16 +10,16 @@ import { restartProxy } from './systemd.mjs'
 import { TOKEN_REQUEST_TIMEOUT_MS } from './token-refresh.mjs'
 
 /**
- * `spicy-trade connect-tastytrade`: connect tastytrade through spicy.trade's OAuth app, once, and
+ * `spicytrade connect-tastytrade`: connect tastytrade through spicytrade's OAuth app, once, and
  * keep the result in the OS keyring.
  *
- * The member approves spicy.trade on tastytrade's own page; the browser comes back through the Worker
+ * The member approves spicytrade on tastytrade's own page; the browser comes back through the Worker
  * to a listener here on the loopback address; this process redeems the code through the Worker
  * and stores the refresh token under `tastytrade/app-refresh-token`, where the local proxy finds
  * it. The Worker holds the app's client secret and never keeps the refresh token; this machine
  * keeps the refresh token and never needs a client secret.
  *
- * Every Worker call carries the member's spicy.trade agent token from the keyring, which is what binds
+ * Every Worker call carries the member's spicytrade agent token from the keyring, which is what binds
  * the whole connection to that member: a started connection can be redeemed only with the same
  * token, so the consent URL, the code, and the state are each useless to anyone else.
  *
@@ -27,7 +27,7 @@ import { TOKEN_REQUEST_TIMEOUT_MS } from './token-refresh.mjs'
  * following it is the whole point, and its state grants nothing without the agent token.
  */
 
-const PROGRAM = 'SpicyTradeConnectTastytrade'
+const PROGRAM = 'SpicytradeConnectTastytrade'
 const BROKER = TASTYTRADE
 const KEY = APP_REFRESH_TOKEN_KEY
 
@@ -57,16 +57,16 @@ async function callWorker(path, agentBearer, body) {
       signal: AbortSignal.timeout(TOKEN_REQUEST_TIMEOUT_MS),
     })
   } catch (error) {
-    throw new CliFailure(`spicy.trade could not be reached (${error instanceof Error ? error.name : 'UnknownError'})`)
+    throw new CliFailure(`spicytrade could not be reached (${error instanceof Error ? error.name : 'UnknownError'})`)
   }
   const payload = await response.json().catch(() => undefined)
   if (!response.ok) {
     const tastytradeStatus = z.object({ tastytradeStatus: z.number().int() }).safeParse(payload)
     if (response.status === 401) {
-      throw new CliFailure(`spicy.trade did not accept the agent token in the keyring. Sign in again with:\n  ${cliCommand('login')}`)
+      throw new CliFailure(`spicytrade did not accept the agent token in the keyring. Sign in again with:\n  ${cliCommand('login')}`)
     }
     if (tastytradeStatus.success) throw new CliFailure(`tastytrade refused the grant (HTTP ${tastytradeStatus.data.tastytradeStatus})`)
-    throw new CliFailure(`spicy.trade refused ${path} (HTTP ${response.status})`)
+    throw new CliFailure(`spicytrade refused ${path} (HTTP ${response.status})`)
   }
   return payload
 }
@@ -75,7 +75,7 @@ async function callWorker(path, agentBearer, body) {
 export async function connectTastytrade(out = process.stdout) {
   const agentBearer = await agentToken(PROGRAM)
   if (!agentBearer) {
-    throw new CliFailure(`no spicy.trade token in the keyring. Sign this machine in first:\n  ${cliCommand('login')}`)
+    throw new CliFailure(`no spicytrade token in the keyring. Sign this machine in first:\n  ${cliCommand('login')}`)
   }
   // The proxy refuses a keyring holding both kinds, so connecting over a personal grant would
   // only leave it unable to start. Say so now, before the member goes through tastytrade.
@@ -89,7 +89,7 @@ export async function connectTastytrade(out = process.stdout) {
 
   const listener = await loopbackListener(PROGRAM, {
     forbidden: 'This listener only answers the tastytrade return.',
-    received: 'spicy.trade received the authorization. You can close this tab and return to the terminal.',
+    received: 'spicytrade received the authorization. You can close this tab and return to the terminal.',
     refused: 'tastytrade did not grant access. You can close this tab.',
   })
   let authorization
@@ -104,12 +104,12 @@ export async function connectTastytrade(out = process.stdout) {
   }
   if (!authorization.success) {
     listener.close()
-    throw new CliFailure('spicy.trade answered the authorization request with an unreadable response')
+    throw new CliFailure('spicytrade answered the authorization request with an unreadable response')
   }
   const { authorizationUrl, expiresAt, state } = authorization.data
   listener.expect(state)
 
-  out.write(`Approve spicy.trade on tastytrade to connect your account:\n\n  ${authorizationUrl}\n\n`)
+  out.write(`Approve spicytrade on tastytrade to connect your account:\n\n  ${authorizationUrl}\n\n`)
   openBrowser(authorizationUrl)
 
   // Waits no longer than the Worker keeps the connection redeemable.
@@ -120,10 +120,10 @@ export async function connectTastytrade(out = process.stdout) {
   const exchanged = ExchangeResponseSchema.safeParse(
     await callWorker('/api/brokers/tastytrade/exchange', agentBearer, { code: outcome.code, state }),
   )
-  if (!exchanged.success) throw new CliFailure('spicy.trade answered the exchange with an unreadable response')
+  if (!exchanged.success) throw new CliFailure('spicytrade answered the exchange with an unreadable response')
   const { refreshToken } = exchanged.data
 
-  if (!await keyringStore(BROKER, KEY, 'tastytrade refresh token (spicy.trade app)', refreshToken)) {
+  if (!await keyringStore(BROKER, KEY, 'tastytrade refresh token (spicytrade app)', refreshToken)) {
     throw new CliFailure(`failed to store ${BROKER}/${KEY}`)
   }
   if (await keyringSecret(PROGRAM, BROKER, KEY) !== refreshToken) throw new CliFailure(`failed to store ${BROKER}/${KEY}`)

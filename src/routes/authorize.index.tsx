@@ -57,13 +57,13 @@ function AuthorizePage() {
       {viewer.phase === 'checking' && <Spinner />}
       {viewer.phase === 'error' && (
         <p className="authorize-error">
-          spicy.trade could not check whether you are signed in. Reload to try again.
+          spicytrade could not check whether you are signed in. Reload to try again.
         </p>
       )}
       {viewer.phase === 'ready' && viewer.user === null && (
         <>
           <p>
-            An agent is asking to connect to spicy.trade as you. Sign in to continue, and you will be
+            An agent is asking to connect to spicytrade as you. Sign in to continue, and you will be
             returned here automatically.
           </p>
           <GoogleSignInButton callbackURL={`/authorize${rawSearch}`} />

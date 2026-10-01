@@ -178,7 +178,7 @@ function ViewerMenu({ viewerImage, viewerName }: { viewerImage?: string; viewerN
         <Avatar className="viewer-avatar">
           {/* alt="" because the trigger already carries the account name as its aria-label; a
               second label here would read it twice to a screen reader. no-referrer keeps
-              Google from seeing which spicy.trade page requested the image. */}
+              Google from seeing which spicytrade page requested the image. */}
           {viewerImage && <AvatarImage alt="" referrerPolicy="no-referrer" src={viewerImage} />}
           <AvatarFallback>{viewerName.trim().charAt(0).toUpperCase()}</AvatarFallback>
         </Avatar>

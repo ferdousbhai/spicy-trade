@@ -9,10 +9,10 @@ import { restartProxy } from './systemd.mjs'
 import { UPSTREAM_TIMEOUT_MS } from './token-refresh.mjs'
 
 /**
- * `spicy-trade login`: sign this machine in to spicy.trade from a browser, and keep the agent
+ * `spicytrade login`: sign this machine in to spicytrade from a browser, and keep the agent
  * token it is issued in the OS keyring, where the proxy reads it.
  *
- * The member approves on spicy.trade's `/connect/agent` page, already signed in there; the page
+ * The member approves on spicytrade's `/connect/agent` page, already signed in there; the page
  * sends the browser back to a listener here with a one-time code; this process redeems the code
  * for the token. The token itself never rides in a URL or the browser's history -- only the code
  * does, and the code is bound to a verifier that never leaves this process (PKCE, RFC 7636, with
@@ -23,7 +23,7 @@ import { UPSTREAM_TIMEOUT_MS } from './token-refresh.mjs'
  * because following it is the whole point, and nothing in it grants anything on its own.
  */
 
-const PROGRAM = 'SpicyTradeLogin'
+const PROGRAM = 'SpicytradeLogin'
 
 /**
  * 32 random bytes, as the Worker's contract (`AGENT_LOGIN_RANDOM_BYTES` in
@@ -32,7 +32,7 @@ const PROGRAM = 'SpicyTradeLogin'
 const RANDOM_BYTES = 32
 
 /**
- * How long to wait for the member to approve. It covers signing in to spicy.trade with Google
+ * How long to wait for the member to approve. It covers signing in to spicytrade with Google
  * first, the slowest thing a member does on that page, and matches how long a started tastytrade
  * connection stays redeemable (`BROKER_AUTHORIZATION_TTL_MS`). A product judgment.
  */
@@ -68,7 +68,7 @@ async function exchange(code, codeVerifier, previousToken) {
       signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
     })
   } catch (error) {
-    throw new CliFailure(`spicy.trade could not be reached (${error instanceof Error ? error.name : 'UnknownError'})`)
+    throw new CliFailure(`spicytrade could not be reached (${error instanceof Error ? error.name : 'UnknownError'})`)
   }
   const payload = await response.json().catch(() => undefined)
   if (response.status === 400) {
@@ -78,9 +78,9 @@ async function exchange(code, codeVerifier, previousToken) {
     throw new CliFailure('your account already holds as many agent tokens as it may. Revoke one you no longer\n'
       + `use under "Headless access" in the Connect tab (${ORIGIN}/connect), then run this again.`)
   }
-  if (!response.ok) throw new CliFailure(`spicy.trade refused the sign-in (HTTP ${response.status})`)
+  if (!response.ok) throw new CliFailure(`spicytrade refused the sign-in (HTTP ${response.status})`)
   const parsed = ExchangeResponseSchema.safeParse(payload)
-  if (!parsed.success) throw new CliFailure('spicy.trade answered the sign-in with an unreadable response')
+  if (!parsed.success) throw new CliFailure('spicytrade answered the sign-in with an unreadable response')
   return parsed.data.token
 }
 
@@ -97,9 +97,9 @@ export async function login(out = process.stdout, options = { restartProxy: true
   const challenge = createHash('sha256').update(codeVerifier).digest('base64url')
 
   const listener = await loopbackListener(PROGRAM, {
-    forbidden: 'This listener only answers the spicy.trade sign-in.',
-    received: 'This computer is signed in to spicy.trade. You can close this tab and return to the terminal.',
-    refused: 'spicy.trade did not approve this computer. You can close this tab.',
+    forbidden: 'This listener only answers the spicytrade sign-in.',
+    received: 'This computer is signed in to spicytrade. You can close this tab and return to the terminal.',
+    refused: 'spicytrade did not approve this computer. You can close this tab.',
   })
   listener.expect(state)
   const approval = new URL('/connect/agent', ORIGIN)
@@ -110,12 +110,12 @@ export async function login(out = process.stdout, options = { restartProxy: true
     state,
   }).toString()
 
-  out.write(`Sign in to spicy.trade and approve this computer:\n\n  ${approval}\n\n`)
+  out.write(`Sign in to spicytrade and approve this computer:\n\n  ${approval}\n\n`)
   openBrowser(approval.toString())
 
   const outcome = await awaitReturn(listener, APPROVAL_WAIT_MS)
   if (outcome.lapsed) throw new CliFailure('the sign-in was not approved in time; run this again')
-  if (outcome.error) throw new CliFailure(`spicy.trade did not approve this computer (${outcome.error})`)
+  if (outcome.error) throw new CliFailure(`spicytrade did not approve this computer (${outcome.error})`)
 
   const token = await exchange(outcome.code, codeVerifier, previousToken)
   if (!await storeAgentToken(PROGRAM, token)) throw new CliFailure(`failed to store ${AGENT_TOKEN_SERVICE}/${MCP_TOKEN_KEY}`)

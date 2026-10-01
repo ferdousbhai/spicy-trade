@@ -133,7 +133,7 @@ function LegacyServiceWorkerRetirement() {
   }, [])
   return failed ? (
     <aside className="service-worker-error" role="alert">
-      spicy.trade could not clear an obsolete offline copy. Clear this site's browser data, then reload.
+      spicytrade could not clear an obsolete offline copy. Clear this site's browser data, then reload.
     </aside>
   ) : null
 }

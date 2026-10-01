@@ -1,5 +1,5 @@
 /**
- * Renamed from `X-Heston-Deployment-Id` with the move to spicy.trade, without sending both. A
+ * Renamed from `X-Heston-Deployment-Id` with the move to spicytrade, without sending both. A
  * bundle only reads this header on its own origin's responses, and every bundle that reads the
  * old name was served from heston.io, which now answers only with a cross-origin 308 its fetches
  * cannot follow. A response without the header reads as "not newer", so nothing reload-loops.

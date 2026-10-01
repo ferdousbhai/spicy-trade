@@ -16,8 +16,8 @@ import { CopyBlock } from './copy-block'
 import { MCP_ENDPOINT } from '../domain/site'
 
 const PROXY_URL = 'http://127.0.0.1:8787/mcp'
-/** The name every client's config knows the server by; `spicy-trade setup` adds it under this too. */
-const MCP_SERVER_NAME = 'spicy-trade'
+/** The name every client's config knows the server by; `spicytrade setup` adds it under this too. */
+const MCP_SERVER_NAME = 'spicytrade'
 const addCommands = (url: string) => ({
   claude: `claude mcp add --transport http ${MCP_SERVER_NAME} ${url}`,
   codex: `codex mcp add ${MCP_SERVER_NAME} --url ${url}`,
@@ -28,10 +28,10 @@ const addCommands = (url: string) => ({
  * The one command for the proxy path: it runs the browser sign-in, the keyring, the service, the
  * brokerage and the agent's config in order, and is also the repair when any of them is missing.
  */
-const SETUP_COMMAND = './ops/spicy-trade/spicy-trade.mjs setup'
-const DOCTOR_COMMAND = './ops/spicy-trade/spicy-trade.mjs doctor'
-/** Reads the spicy.trade token from the keyring, so it needs the token stored first. */
-const CONNECT_TASTYTRADE_COMMAND = './ops/spicy-trade/connect-tastytrade.mjs'
+const SETUP_COMMAND = './ops/spicytrade/spicytrade.mjs setup'
+const DOCTOR_COMMAND = './ops/spicytrade/spicytrade.mjs doctor'
+/** Reads the spicytrade token from the keyring, so it needs the token stored first. */
+const CONNECT_TASTYTRADE_COMMAND = './ops/spicytrade/connect-tastytrade.mjs'
 
 /**
  * The clients the page has exact commands for, and "Other" for everything that speaks
@@ -232,7 +232,7 @@ export function ConnectScreen({ owner }: { owner: boolean }) {
       <header>
         <h1>Connect your agent</h1>
         <p>
-          spicy.trade is a tool surface for an agent running on your own machine — Claude Code, Grok, Codex, or
+          spicytrade is a tool surface for an agent running on your own machine — Claude Code, Grok, Codex, or
           anything that speaks MCP. Any agent can read the public market surface without signing in
           at all. Signing yours in adds live quotes, option chains and Greeks, lets it add symbols
           to the watchlist, and lets it record catalysts and evidence everyone reads.
@@ -250,7 +250,7 @@ export function ConnectScreen({ owner }: { owner: boolean }) {
             Orders run the same server-side guards regardless of what any agent recommends: the exact
             contract is resolved from the live chain, the portfolio and market checks
             run against fresh broker state, and the broker&apos;s own dry-run must come back clean. A
-            refusal is final. spicy.trade has no confirmation step of its own: any prompt before an order
+            refusal is final. spicytrade has no confirmation step of its own: any prompt before an order
             comes from your agent, and the server-side guards are what bound the risk.
           </p>
           {owner && (
@@ -264,10 +264,10 @@ export function ConnectScreen({ owner }: { owner: boolean }) {
       </aside>
 
       <section className="connect-step">
-        <h2>1 · Point your agent at spicy.trade</h2>
+        <h2>1 · Point your agent at spicytrade</h2>
         {/* A request with no credential is served, not challenged (src/server/mcp.ts), so adding
             the server never starts a sign-in by itself. Sign-in is whatever the client does with
-            the OAuth discovery documents spicy.trade publishes, which varies by client. */}
+            the OAuth discovery documents spicytrade publishes, which varies by client. */}
         <p>
           Run the command for your agent and it connects straight away at the public tier: the cached market
           snapshot, price history, and the shared research, with nothing to copy and no sign-in.
@@ -286,7 +286,7 @@ export function ConnectScreen({ owner }: { owner: boolean }) {
             )}
         <p>
           To add live quotes, option chains, and Greeks, sign in from your client&apos;s own
-          authenticate action for this server. spicy.trade publishes standard OAuth discovery, so a
+          authenticate action for this server. spicytrade publishes standard OAuth discovery, so a
           client that supports it opens a browser to sign you in with Google and renews its own
           access — you should not need to come back here.
           {client === 'claude' && <> In Claude Code that is <code>/mcp</code>.</>}
@@ -306,7 +306,7 @@ export function ConnectScreen({ owner }: { owner: boolean }) {
       <details className="connect-step connect-fold">
         <summary><h2>2 · Local proxy <span className="connect-optional">optional</span></h2></summary>
         <p>
-          A process on this machine attaches your spicy.trade token, and your brokerage&apos;s short-lived
+          A process on this machine attaches your spicytrade token, and your brokerage&apos;s short-lived
           token, from the keyring, so the agent holds neither. That is how balances, positions and
           orders reach your agent, and how any client that cannot complete a browser sign-in gets
           live quotes, chains, and Greeks. From a checkout of this repository, run:
@@ -314,15 +314,15 @@ export function ConnectScreen({ owner }: { owner: boolean }) {
         <CopyBlock label="Set up the proxy" value={SETUP_COMMAND} />
         <p>
           It signs you in through the browser, stores the token in your keyring, installs the proxy,
-          offers to connect tastytrade, and adds spicy.trade to your agent. Run it again at any time;
+          offers to connect tastytrade, and adds spicytrade to your agent. Run it again at any time;
           it skips what is already done. If something stops working, run{' '}
           <code>{DOCTOR_COMMAND}</code> and it names the step to fix.
         </p>
         <details className="connect-manual">
           <summary>Manual setup</summary>
           <CopyBlock
-            label="Store your spicy.trade token"
-            value={'./ops/spicy-trade/store-credentials.sh mcp-token'}
+            label="Store your spicytrade token"
+            value={'./ops/spicytrade/store-credentials.sh mcp-token'}
           />
           <p>Issue the token in step 3, paste it at the prompt. The script restarts the proxy.</p>
           {proxyCommand
@@ -335,8 +335,8 @@ export function ConnectScreen({ owner }: { owner: boolean }) {
           </p>
           <p>
             A brokerage is a second store: balances, positions, order history, and orders against
-            your account only. Run this, approve spicy.trade on tastytrade&apos;s own page, and the grant
-            lands in your keyring — spicy.trade never keeps it. The script restarts the proxy.
+            your account only. Run this, approve spicytrade on tastytrade&apos;s own page, and the grant
+            lands in your keyring — spicytrade never keeps it. The script restarts the proxy.
           </p>
           <CopyBlock label="Connect tastytrade" value={CONNECT_TASTYTRADE_COMMAND} />
           <p className="connect-note">
@@ -345,7 +345,7 @@ export function ConnectScreen({ owner }: { owner: boolean }) {
           </p>
           <CopyBlock
             label="Store a personal grant"
-            value={'./ops/spicy-trade/store-credentials.sh tastytrade'}
+            value={'./ops/spicytrade/store-credentials.sh tastytrade'}
           />
         </details>
       </details>

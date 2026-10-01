@@ -58,6 +58,6 @@ it('reports a refused approval in the server\'s words', async () => {
 it('asks a signed-out visitor to sign in first', async () => {
   vi.stubGlobal('fetch', vi.fn(async () => Response.json({ user: null })))
   open({ challenge: CHALLENGE, label: 'laptop', port: '43210', state: STATE })
-  await screen.findByText(/is asking to connect to spicy.trade as you/)
+  await screen.findByText(/is asking to connect to spicytrade as you/)
   expect(screen.queryByRole('button', { name: 'Approve' })).toBeNull()
 })

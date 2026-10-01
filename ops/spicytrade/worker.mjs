@@ -2,7 +2,7 @@ import { UPSTREAM } from './config.mjs'
 import { UPSTREAM_TIMEOUT_MS } from './token-refresh.mjs'
 
 /**
- * Whether spicy.trade accepts an agent token: the one question `setup`, `doctor` and the
+ * Whether spicytrade accepts an agent token: the one question `setup`, `doctor` and the
  * credential scripts all have to answer before they can say anything useful.
  *
  * Asked the way an agent would ask it -- a `tools/list` on the MCP endpoint, the cheapest call that
@@ -41,9 +41,9 @@ export async function checkAgentToken(token) {
 /** One line for a check that did not come back accepted. */
 export function describeTokenCheck(check) {
   switch (check.status) {
-    case 'accepted': return 'spicy.trade accepts the agent token'
-    case 'rejected': return 'spicy.trade rejected the agent token'
-    case 'unanswered': return `spicy.trade could not check the agent token (HTTP ${check.httpStatus})`
-    default: return `spicy.trade could not be reached (${check.transport})`
+    case 'accepted': return 'spicytrade accepts the agent token'
+    case 'rejected': return 'spicytrade rejected the agent token'
+    case 'unanswered': return `spicytrade could not check the agent token (HTTP ${check.httpStatus})`
+    default: return `spicytrade could not be reached (${check.transport})`
   }
 }

@@ -76,7 +76,7 @@ export function createSpiceMcpServer(
   // built for this caller's tier: it is paid for on every turn, and a rule about a tool they
   // were not given is a per-turn tax on a refusal they cannot reach.
   const server = new McpServer(
-    { name: 'spicy-trade', version: '1.0.0' },
+    { name: 'spicytrade', version: '1.0.0' },
     { instructions: spiceMcpInstructions(caller.signedIn) },
   )
 
@@ -195,8 +195,8 @@ export function createSpiceMcpServer(
   // at this URI, and the guide describes the credential-free tier as well.
   server.registerResource(
     'guide',
-    'spicy-trade://guide',
-    { description: 'What spicy.trade can answer and which tool answers it.', mimeType: 'text/markdown', title: 'spicy.trade guide' },
+    'spicytrade://guide',
+    { description: 'What spicytrade can answer and which tool answers it.', mimeType: 'text/markdown', title: 'spicytrade guide' },
     (uri) => ({ contents: [{ text: SPICE_GUIDE, uri: uri.href }] }),
   )
 
@@ -247,7 +247,7 @@ function createOrderTools(
  * own machine and a cookie jar is the wrong shape for it. Ownership is decided by the same
  * `isOwnerEmail` the cookie surface uses, so there is exactly one definition of it.
  *
- * Every signed-in caller is a spicy.trade user row, reached one of two ways: a minted token's digest
+ * Every signed-in caller is a spicytrade user row, reached one of two ways: a minted token's digest
  * in `user_mcp_tokens`, or an OAuth access token whose verified `sub` names the user. A caller who
  * presents nothing is `ANONYMOUS_CALLER`, which is no row at all and holds only the public tier.
  * There is no shared secret: the `HESTON_MCP_TOKEN` that authenticated as the owner during the
@@ -363,7 +363,7 @@ function authChallenge(request: Request, description: string): Response {
  */
 function callerLookupFailed(request: Request, errorName: string): Response {
   console.error('McpCallerLookupFailed', errorName)
-  return authChallenge(request, 'spicy.trade could not verify this request.')
+  return authChallenge(request, 'spicytrade could not verify this request.')
 }
 
 /**
@@ -420,7 +420,7 @@ export async function handleMcpRequest(request: Request, env: AppEnv, ctx: McpEx
     // would be the one shape that risks opening the surface. The outage is observable in this log
     // line rather than in the status code.
     console.error('McpAuthUnavailable', error instanceof Error ? error.name : 'UnknownError')
-    return authChallenge(request, 'spicy.trade could not verify this request.')
+    return authChallenge(request, 'spicytrade could not verify this request.')
   }
 
   let claims
@@ -434,7 +434,7 @@ export async function handleMcpRequest(request: Request, env: AppEnv, ctx: McpEx
     // loses the challenge that would let them authenticate; it also reads as a broken endpoint
     // rather than a bad token, which is how a whole broken flow stayed invisible.
     console.error('McpOAuthVerificationFailed', error instanceof Error ? error.name : 'UnknownError')
-    return authChallenge(request, 'spicy.trade could not verify this token.')
+    return authChallenge(request, 'spicytrade could not verify this token.')
   }
 
   let caller
@@ -446,7 +446,7 @@ export async function handleMcpRequest(request: Request, env: AppEnv, ctx: McpEx
   // A token whose subject is not a user this server knows authenticates nothing.
   if (!caller) {
     console.error('McpAuthRejected')
-    return authChallenge(request, 'This token does not identify a spicy.trade member.')
+    return authChallenge(request, 'This token does not identify a spicytrade member.')
   }
   return serveMcp(request, env, ctx, caller)
 }

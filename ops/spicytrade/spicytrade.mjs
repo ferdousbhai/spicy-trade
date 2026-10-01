@@ -6,18 +6,18 @@ import { setup } from './setup.mjs'
 import { connectTastytrade } from './tastytrade-connect.mjs'
 
 /**
- * `spicy-trade`: the one command a member runs on their own machine. `setup` is the whole path
+ * `spicytrade`: the one command a member runs on their own machine. `setup` is the whole path
  * from nothing to a working agent; the others are its steps, for when only one needs redoing.
  */
 
-const USAGE = `Usage: spicy-trade <command>
+const USAGE = `Usage: spicytrade <command>
 
   setup               Sign in, install the local proxy, optionally connect tastytrade, and
                       point Claude Code and Codex at the proxy. Safe to run again: it skips
                       what is done and repairs what is not.
-  login               Sign this machine in to spicy.trade from the browser.
-  connect-tastytrade  Approve spicy.trade on tastytrade, so agents can trade your account.
-  doctor              Check every link from agent to spicy.trade, and say how to fix each.
+  login               Sign this machine in to spicytrade from the browser.
+  connect-tastytrade  Approve spicytrade on tastytrade, so agents can trade your account.
+  doctor              Check every link from agent to spicytrade, and say how to fix each.
 `
 
 const COMMANDS = {
@@ -38,7 +38,7 @@ if (command === undefined || command === '-h' || command === '--help' || command
     await COMMANDS[command]()
   } catch (error) {
     if (!(error instanceof CliFailure)) throw error
-    process.stderr.write(`spicy-trade ${command}: ${error.message}\n`)
+    process.stderr.write(`spicytrade ${command}: ${error.message}\n`)
     process.exitCode = 1
   }
 }

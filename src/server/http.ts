@@ -9,7 +9,7 @@ import {
   type AuthenticatedIdentity,
 } from './auth'
 import { type AppEnv } from './env'
-import { MCP_ENDPOINT, MCP_PATH, SITE_NAME, SITE_ORIGIN } from '../domain/site'
+import { MCP_ENDPOINT, MCP_PATH, SITE_HOST, SITE_NAME, SITE_ORIGIN } from '../domain/site'
 
 /**
  * `www` plus the retired heston.io and tryspice.xyz brands, whose zones still route here so their
@@ -17,7 +17,7 @@ import { MCP_ENDPOINT, MCP_PATH, SITE_NAME, SITE_ORIGIN } from '../domain/site'
  * survive the hop.
  */
 const NON_CANONICAL_HOSTS = new Set([
-  `www.${SITE_NAME}`,
+  `www.${SITE_HOST}`,
   'heston.io',
   'www.heston.io',
   'tryspice.xyz',

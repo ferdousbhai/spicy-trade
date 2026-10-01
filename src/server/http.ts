@@ -9,26 +9,7 @@ import {
   type AuthenticatedIdentity,
 } from './auth'
 import { type AppEnv } from './env'
-import { MCP_ENDPOINT, MCP_PATH, SITE_HOST, SITE_NAME, SITE_ORIGIN } from '../domain/site'
 
-/**
- * `www` plus the retired heston.io and tryspice.xyz brands, whose zones still route here so their
- * links keep resolving. 308 preserves method and body, so a page load and a form POST both
- * survive the hop.
- */
-const NON_CANONICAL_HOSTS = new Set([
-  `www.${SITE_HOST}`,
-  'heston.io',
-  'www.heston.io',
-  'tryspice.xyz',
-  'www.tryspice.xyz',
-])
-/**
- * The MCP endpoint on an old host is refused rather than redirected. A cross-origin redirect
- * drops `Authorization`, and `/mcp` serves a header-less request as the anonymous caller, so a
- * member's agent following the 308 would silently lose its account tools instead of failing.
- * An error naming the canonical endpoint is what tells the member to re-point the config.
- */
 // The edge copy is shared by every reader, so it may hold twice what one browser keeps.
 export const PUBLIC_RESPONSE_CACHE_CONTROL = `public, max-age=${PUBLIC_RESPONSE_MAX_AGE_SECONDS}, s-maxage=${2 * PUBLIC_RESPONSE_MAX_AGE_SECONDS}`
 /**
@@ -37,22 +18,6 @@ export const PUBLIC_RESPONSE_CACHE_CONTROL = `public, max-age=${PUBLIC_RESPONSE_
  * first published late, so it may be kept for an hour by a browser and a day at the edge.
  */
 export const ARCHIVE_RESPONSE_CACHE_CONTROL = 'public, max-age=3600, s-maxage=86400'
-
-export function canonicalHostRedirect(request: Request): Response | undefined {
-  const url = new URL(request.url)
-  if (!NON_CANONICAL_HOSTS.has(url.hostname)) return undefined
-  if (url.pathname === MCP_PATH) {
-    return Response.json({
-      error: {
-        code: -32_600,
-        message: `${SITE_NAME}'s MCP endpoint is ${MCP_ENDPOINT} — this host no longer serves it. Reconnect to ${MCP_ENDPOINT}.`,
-      },
-      id: null,
-      jsonrpc: '2.0',
-    }, { headers: { 'Cache-Control': 'no-store' }, status: 404 })
-  }
-  return Response.redirect(`${SITE_ORIGIN}${url.pathname}${url.search}`, 308)
-}
 
 export function jsonNoStore(value: JsonValue, init: ResponseInit = {}): Response {
   const headers = new Headers(init.headers)

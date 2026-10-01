@@ -1,6 +1,6 @@
 /** The product's one public address. */
 export const SITE_ORIGIN = 'https://spicy.trade'
-/** The domain alone, for mail addresses and host checks. It is not the brand. */
+/** The domain alone, for mail addresses. It is not the brand. */
 export const SITE_HOST = new URL(SITE_ORIGIN).host
 /**
  * The brand is spicytrade, not the domain: the name every surface shows -- page titles, the

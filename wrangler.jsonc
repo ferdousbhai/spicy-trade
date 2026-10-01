@@ -12,16 +12,11 @@
   "main": "./src/server.ts",
   "workers_dev": false,
   "preview_urls": true,
-  // The retired heston.io and tryspice.xyz pairs, and www.spicy.trade, still route here so
-  // `canonicalHostRedirect` can 308 them to spicy.trade; drop a retired pair when its zone is
-  // allowed to lapse.
+  // The Worker serves spicy.trade alone. www.spicy.trade and the retired heston.io and tryspice.xyz
+  // domains are redirected to it by Cloudflare Redirect Rules on their own zones, never routed
+  // here, so deleting or replacing this Worker cannot take their DNS records with it.
   "routes": [
-    { "pattern": "spicy.trade", "custom_domain": true },
-    { "pattern": "www.spicy.trade", "custom_domain": true },
-    { "pattern": "heston.io", "custom_domain": true },
-    { "pattern": "www.heston.io", "custom_domain": true },
-    { "pattern": "tryspice.xyz", "custom_domain": true },
-    { "pattern": "www.tryspice.xyz", "custom_domain": true }
+    { "pattern": "spicy.trade", "custom_domain": true }
   ],
   "observability": {
     "enabled": true,

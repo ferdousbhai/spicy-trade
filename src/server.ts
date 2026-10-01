@@ -2,7 +2,7 @@ import handler from '@tanstack/react-start/server-entry'
 
 import { handleWellKnownDiscovery } from './server/auth'
 import { type AppEnv } from './server/env'
-import { canonicalHostRedirect, finalizeDocumentResponse } from './server/http'
+import { finalizeDocumentResponse } from './server/http'
 import { mcpEndpointRedirect } from './server/mcp-endpoint-redirect'
 import { configureTypeboxRuntime } from './server/typebox-runtime'
 import { MCP_PATH } from './domain/site'
@@ -25,8 +25,6 @@ export { MarketFeed } from './server/market-feed'
 
 export default {
   async fetch(request: Request, env: AppEnv, ctx: ExecutionContext) {
-    const canonicalRedirect = canonicalHostRedirect(request)
-    if (canonicalRedirect) return canonicalRedirect
     const url = new URL(request.url)
     // OAuth discovery. An MCP client reads these before it can authenticate at all, and only
     // ever at the origin.

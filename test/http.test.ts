@@ -3,47 +3,12 @@ import { describe, expect, it } from 'vitest'
 import {
   authenticateRequest,
   authorizePersonalRequest,
-  canonicalHostRedirect,
   finalizeDocumentResponse,
   jsonPrivateRevalidate,
   jsonPublic,
 } from '../src/server/http'
 import { SPICE_DEPLOYMENT_ID_HEADER } from '../src/domain/deployment'
 import { STORAGE_PURGE_COOKIE } from '../src/domain/storage-purge'
-
-describe('canonical host redirect', () => {
-  // Every host that routes here but is not the canonical origin: www, and the retired
-  // heston.io and tryspice.xyz brands. Each is asserted explicitly.
-  const OLD_HOSTS = ['www.spicy.trade', 'heston.io', 'www.heston.io', 'tryspice.xyz', 'www.tryspice.xyz']
-
-  it('leaves the canonical host alone', () => {
-    expect(canonicalHostRedirect(new Request('https://spicy.trade/'))).toBeUndefined()
-    expect(canonicalHostRedirect(new Request('https://spicy.trade/privacy?from=x'))).toBeUndefined()
-  })
-
-  it.each(OLD_HOSTS)('308s %s to https://spicy.trade, preserving path and query', (host) => {
-    const response = canonicalHostRedirect(new Request(`https://${host}/privacy?from=old&x=1`))
-    expect(response?.status).toBe(308)
-    expect(response?.headers.get('location')).toBe('https://spicy.trade/privacy?from=old&x=1')
-    const root = canonicalHostRedirect(new Request(`https://${host}/`))
-    expect(root?.status).toBe(308)
-    expect(root?.headers.get('location')).toBe('https://spicy.trade/')
-  })
-
-  it.each(OLD_HOSTS)('refuses /mcp on %s instead of redirecting it into the anonymous tier', async (host) => {
-    const response = canonicalHostRedirect(new Request(`https://${host}/mcp`, {
-      body: JSON.stringify({ id: 1, jsonrpc: '2.0', method: 'initialize' }),
-      headers: { authorization: 'Bearer hst_example', 'content-type': 'application/json' },
-      method: 'POST',
-    }))
-    expect(response?.status).toBe(404)
-    expect(response?.headers.get('location')).toBeNull()
-    expect(await response?.json()).toMatchObject({
-      error: { message: expect.stringContaining('https://spicy.trade/mcp') },
-      jsonrpc: '2.0',
-    })
-  })
-})
 
 describe('document response', () => {
   const html = () => new Response('<!doctype html>', { headers: { 'content-type': 'text/html; charset=utf-8' } })

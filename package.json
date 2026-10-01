@@ -9,11 +9,11 @@
   "scripts": {
     "dev": "vite dev --port 3000",
     "lint": "eslint \"{src,test}/**/*.{ts,tsx}\" --max-warnings=0 && oxlint",
-    "build": "vite build && tsc --noEmit && node tools/apply-migrations.mjs",
+    "build": "cf build && tsc --noEmit && node tools/apply-migrations.mjs",
     "workers-builds:build": "npm ci && npm run lint && npm test && npm run build",
     "preview": "vite preview",
-    "deploy": "npm run build && wrangler d1 migrations apply DB --remote --config wrangler.jsonc && wrangler deploy --config dist/server/wrangler.json",
-    "deploy:preview": "npm run build && wrangler versions upload --config dist/server/wrangler.json",
+    "deploy": "npm run build && cf d1 migrations apply e45e35cc-bd01-4e29-8940-b5d2ef5e840c --dir migrations && cf deploy --prebuilt",
+    "deploy:preview": "npm run build && cf workers versions create --prebuilt",
     "cf-typegen": "wrangler types",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -47,7 +47,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@cloudflare/vite-plugin": "^1.26.0",
+    "@cloudflare/vite-plugin": "2.0.0-beta.sha-ad79608dd",
     "@oxlint/plugins": "1.78.0",
     "@playwright/test": "^1.62.1",
     "@tailwindcss/vite": "^4.3.3",
@@ -57,6 +57,7 @@
     "@types/react-dom": "^19.2.0",
     "@typescript-eslint/parser": "^8.67.0",
     "@vitejs/plugin-react": "^6.0.1",
+    "cf": "1.0.0-beta.10",
     "eslint": "^10.8.1",
     "eslint-plugin-react-hooks": "^7.1.1",
     "jsdom": "^30.0.1",
@@ -65,6 +66,6 @@
     "typescript": "^6.0.2",
     "vite": "^8.0.0",
     "vitest": "^4.1.10",
-    "wrangler": "^4.126.0"
+    "wrangler": "^4.145.0"
   }
 }

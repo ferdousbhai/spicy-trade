@@ -6,7 +6,7 @@ import { spawnSync } from 'node:child_process'
  *
  * This runs at the END of `npm run build` rather than in the deploy step, which is where it
  * belongs and where this repository's rule used to put it. The deploy command is configured in
- * the Cloudflare dashboard as a bare `npx wrangler deploy` and cannot be changed through the
+ * the Cloudflare dashboard as a bare `npx cf deploy --prebuilt` and cannot be changed through the
  * API with the credentials available here, so the build command — which is
  * `npm run workers-builds:build` (ending in `npm run build`), and therefore ours to define — is
  * the only lever the repository actually has. On 2026-09-04 a push shipped code whose three new
@@ -16,7 +16,7 @@ import { spawnSync } from 'node:child_process'
  * Ordering is the thing that makes it defensible. Because this is the last step of the build,
  * everything that can fail on the way to a deployable artifact — the bundle, the typecheck — has
  * already succeeded. The only failure that can still strand the schema ahead of the code is
- * `wrangler deploy` itself, which is exactly the exposure the deploy-step version would have had.
+ * `cf deploy` itself, which is exactly the exposure the deploy-step version would have had.
  *
  * Two guards keep it from being a footgun:
  *   - `WORKERS_CI` is injected only by Workers Builds, so a developer running `npm run build`
@@ -39,9 +39,11 @@ if (branch !== PRODUCTION_BRANCH) {
 }
 
 process.stdout.write('Migrations: applying to the production database.\n')
+// cf takes the database id rather than the binding name, and applies to the remote database
+// unless told `--local`. The id is the `DB` binding's in cloudflare.config.ts.
 const result = spawnSync(
   'npx',
-  ['wrangler', 'd1', 'migrations', 'apply', 'DB', '--remote', '--config', 'wrangler.jsonc'],
+  ['cf', 'd1', 'migrations', 'apply', 'e45e35cc-bd01-4e29-8940-b5d2ef5e840c', '--dir', 'migrations'],
   { stdio: 'inherit' },
 )
 

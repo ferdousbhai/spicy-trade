@@ -1,11 +1,12 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  // Keeps the pre-rebrand name: renaming a Worker creates a new one, which loses its per-Worker
-  // secrets (BETTER_AUTH_SECRET), its Durable Object state, the Workers Builds connection, and the
-  // service binding the private spice-workflow Workflow uses to reach `BriefPublisher`. Durable Object
-  // class names and migration tags below stay for the same reason: renaming a class needs a
-  // migration and drops its state.
-  "name": "heston",
+  // Changing this name deploys a different Worker: it does not carry the per-Worker secret
+  // (BETTER_AUTH_SECRET), Durable Object state, the Workers Builds connection, or the service
+  // binding the private spice-workflow Workflow uses to reach `BriefPublisher`. The Worker was
+  // `heston` until it moved to this name, which was safe only because both Durable Objects hold
+  // transient coordination (a permit time and an expiring lease); the quarantine lives in D1.
+  // Renaming a Durable Object class below still needs a migration and drops its state.
+  "name": "spicytrade",
   "compatibility_date": "2026-08-18",
   "compatibility_flags": ["nodejs_compat"],
   "main": "./src/server.ts",

@@ -8,9 +8,9 @@
   "durable_objects": {
     // Temporary broker reads share the production account throttle instead of
     // creating an isolated coordinator namespace for each run. `script_name` is the production
-    // Worker's name, which keeps its pre-rebrand spelling (see the root wrangler.jsonc).
+    // Worker's name (see the root wrangler.jsonc).
     "bindings": [
-      { "name": "BROKER_GATE", "class_name": "BrokerGate", "script_name": "heston" }
+      { "name": "BROKER_GATE", "class_name": "BrokerGate", "script_name": "spicytrade" }
     ]
   },
   "secrets_store_secrets": [

@@ -216,7 +216,7 @@ export async function executeOrderPlacement(
     const orderPath = intent.replaceOrderId
       ? `/accounts/${account}/orders/${encodeURIComponent(intent.replaceOrderId)}`
       : `/accounts/${account}/orders`
-    const body = JSON.stringify(intent.replaceOrderId ? replacementOrderPayload(intent.payload) : intent.payload)
+    const body = intent.replaceOrderId ? replacementOrderPayload(intent.payload) : intent.payload
     await lease.renew()
     const dryRun = await brokerApi().tastyRequest(
       env,

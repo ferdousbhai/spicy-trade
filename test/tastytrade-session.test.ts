@@ -78,7 +78,8 @@ describe('tastytrade OAuth boundary', () => {
     expect(tokenCalls.every(([, init]) => init?.signal instanceof AbortSignal)).toBe(true)
     const apiCalls = fetchMock.mock.calls.filter(([input]) => !String(input).endsWith('/oauth/token'))
     expect(apiCalls).toHaveLength(3)
-    expect(brokerGate.gate.acquire).toHaveBeenCalledTimes(3)
+    // Each refresh and each API call takes its own permit from the market gate.
+    expect(brokerGate.gate.acquire).toHaveBeenCalledTimes(6)
     expect(new Set(apiCalls.map(([, init]) => new Headers(init?.headers).get('Authorization')))).toEqual(new Set([
       'Bearer request-token-1',
       'Bearer request-token-2',
@@ -117,7 +118,8 @@ describe('tastytrade OAuth boundary', () => {
     }, '/market-time/equities/sessions/current')).rejects.toThrow('TastytradeAuth:invalid-token-lifetime')
 
     expect(fetchMock).toHaveBeenCalledOnce()
-    expect(brokerGate.gate.acquire).not.toHaveBeenCalled()
+    // Only the refresh ran (and took its permit); no API request followed the malformed token.
+    expect(brokerGate.gate.acquire).toHaveBeenCalledOnce()
   })
 
   it('redacts account identifiers from API errors', async () => {

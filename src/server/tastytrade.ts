@@ -8,8 +8,17 @@ import {
   publicTickerFromTicker,
   type PublicSymbolLookup,
 } from '../domain/market'
+import {
+  createTastytradeClient,
+  memoryTokenStore,
+  TastytradeApiError,
+  TastytradeAuthError,
+  TastytradeOutcomeUnknownError,
+  TastytradeTransportError,
+  type RequestOptions,
+} from 'tasty-agent/tastytrade'
 import { type AppEnv } from './env'
-import { readBoundedJson } from './bounded-response'
+import { toError } from '../domain/failure'
 import {
   catalystsFromMarketMetrics,
   persistAndLoadCatalysts,
@@ -23,7 +32,6 @@ import {
 } from './internal-watchlist'
 import {
   envelopeRows,
-  jsonNumber,
   jsonObject,
   jsonObjectOrEmpty,
   jsonText,
@@ -39,7 +47,6 @@ import {
   type InstrumentCatalogRefresh,
   unresolvedInstrumentCatalogItem,
 } from './instrument-catalog'
-import { tastytradeApiVersion } from './tastytrade-version'
 import { persistTastytradeMarketSnapshot } from './tastytrade-market-store'
 import {
   catalogTickerInstrument,
@@ -90,63 +97,13 @@ export const TASTYTRADE_REQUEST_TIMEOUT_MS = 20_000
 // of short fields, a few KB with a JWT access token; about a hundredfold headroom means a longer
 // token never trips it, while a runaway or hostile body is still refused before it is buffered.
 export const MAX_TASTYTRADE_AUTH_RESPONSE_BYTES = 256_000
-// A cached token must outlive any request it is handed to, so it is retired one request timeout
-// before the provider's expiry — or a tenth of its life, for a token too short-lived to spare a
-// whole timeout and still be worth caching.
-const TOKEN_EXPIRY_SKEW_MS = TASTYTRADE_REQUEST_TIMEOUT_MS
-const MAX_TOKEN_EXPIRY_SKEW_FRACTION = 0.1
-// Provider JSON is buffered for strict parsing; stay within the Worker isolate memory budget
-// while allowing the catalog endpoints, which are substantially larger than normal reads.
-const MAX_TASTYTRADE_RESPONSE_BYTES = 16 * 1024 * 1024
-// This cache contains only the Worker's market-data token. A per-request account token is
-// never cached across requests because this module state is shared by every isolate user.
-let cachedAccess: { expiresAt: number; token: string } | undefined
+// This store holds only the Worker's market-data token, as a settled value: the shared client
+// keeps a pending refresh to itself. A per-request account token is never stored, because this
+// module state is shared by every isolate user.
+const marketTokens = memoryTokenStore()
 
 export function apiBase(env: AppEnv) {
   return env.TASTYTRADE_API_BASE || 'https://api.tastyworks.com'
-}
-
-async function refreshAccessToken(env: AppEnv): Promise<string> {
-  const [clientSecret, refreshToken] = await Promise.all([
-    readStoredSecret(env.TASTYTRADE_CLIENT_SECRET, 'TASTYTRADE_CLIENT_SECRET'),
-    readStoredSecret(env.TASTYTRADE_REFRESH_TOKEN, 'TASTYTRADE_REFRESH_TOKEN'),
-  ])
-  const response = await fetch(`${apiBase(env)}/oauth/token`, {
-    method: 'POST',
-    headers: {
-      Accept: 'application/json',
-      'Content-Type': 'application/json',
-      'User-Agent': USER_AGENT,
-    },
-    body: JSON.stringify({
-      grant_type: 'refresh_token',
-      client_secret: clientSecret,
-      refresh_token: refreshToken,
-    }),
-    signal: AbortSignal.timeout(TASTYTRADE_REQUEST_TIMEOUT_MS),
-  })
-  if (!response.ok) {
-    await response.body?.cancel()
-    throw new Error(`TastytradeAuth:${response.status}`)
-  }
-  const payload = jsonObjectOrEmpty(await readBoundedJson(response, MAX_TASTYTRADE_AUTH_RESPONSE_BYTES, 'TastytradeAuth'))
-  const token = jsonText(payload.access_token)
-  if (!token) throw new CallerVisibleError('TastytradeAuth:missing-token')
-  const lifetimeSeconds = jsonNumber(payload.expires_in)
-  if (lifetimeSeconds === undefined || !Number.isSafeInteger(lifetimeSeconds) || lifetimeSeconds <= 0) {
-    throw new CallerVisibleError('TastytradeAuth:invalid-token-lifetime')
-  }
-  const lifetimeMs = lifetimeSeconds * 1_000
-  const skewMs = Math.min(TOKEN_EXPIRY_SKEW_MS, lifetimeMs * MAX_TOKEN_EXPIRY_SKEW_FRACTION)
-  cachedAccess = { token, expiresAt: Date.now() + lifetimeMs - skewMs }
-  return token
-}
-
-async function accessToken(env: AppEnv): Promise<string> {
-  if (cachedAccess && Date.now() < cachedAccess.expiresAt) return cachedAccess.token
-  // A fulfilled token is plain scalar cache data. A pending fetch Promise is a
-  // request-context I/O object and must never be shared through Worker globals.
-  return refreshAccessToken(env)
 }
 
 function safeEndpoint(path: string): string {
@@ -224,70 +181,75 @@ function accountNumberFromPath(path: string): string | undefined {
   }
 }
 
-async function tokenForPath(
-  env: AppEnv,
-  path: string,
-  credential: BrokerCredential | undefined,
-): Promise<string> {
-  if (!isAccountPath(path)) return accessToken(env)
-  if (credential?.broker !== 'tastytrade' || !credential.accessToken.trim()) {
-    throw new BrokerCredentialMissingError()
+/**
+ * A client for one request's lane. An account path spends the caller's credential and nothing
+ * else: the shared client neither refreshes nor retries a caller-minted token. Every other path
+ * spends the Worker's own grant, whose secrets are read only when a token has to be minted.
+ */
+function laneClient(env: AppEnv, path: string, credential: BrokerCredential | undefined, gate: BrokerRequestGate) {
+  const common = {
+    apiBase: apiBase(env),
+    gate: { acquire: () => gate.acquire() },
+    timeoutMs: TASTYTRADE_REQUEST_TIMEOUT_MS,
+    userAgent: USER_AGENT,
   }
+  if (isAccountPath(path)) return createTastytradeClient({ ...common, accessToken: accountToken(credential) })
+  return createTastytradeClient({
+    ...common,
+    clientSecret: () => readStoredSecret(env.TASTYTRADE_CLIENT_SECRET, 'TASTYTRADE_CLIENT_SECRET'),
+    refreshToken: () => readStoredSecret(env.TASTYTRADE_REFRESH_TOKEN, 'TASTYTRADE_REFRESH_TOKEN'),
+    tokenStore: marketTokens,
+  })
+}
+
+function accountToken(credential: BrokerCredential | undefined): string {
+  if (credential?.broker !== 'tastytrade' || !credential.accessToken.trim()) throw new BrokerCredentialMissingError()
   return credential.accessToken
 }
 
-async function authorizedRequest(
-  env: AppEnv,
-  path: string,
-  init: RequestInit,
-  token: string,
-  gate: BrokerRequestGate,
-): Promise<Response> {
-  await gate.acquire()
-  const headers = new Headers(init.headers)
-  headers.set('Accept', 'application/json')
-  const apiVersion = tastytradeApiVersion(path)
-  if (apiVersion && !headers.has('Accept-Version')) headers.set('Accept-Version', apiVersion)
-  headers.set('Authorization', `Bearer ${token}`)
-  headers.set('User-Agent', USER_AGENT)
-  if (init.body) headers.set('Content-Type', 'application/json')
-  const timeout = AbortSignal.timeout(TASTYTRADE_REQUEST_TIMEOUT_MS)
-  const signal = init.signal ? AbortSignal.any([init.signal, timeout]) : timeout
-  return fetch(`${apiBase(env)}${path}`, { ...init, headers, signal })
+/**
+ * Restates a shared-client failure in this repository's vocabulary. No provider text crosses:
+ * an API refusal keeps only its status and the redacted endpoint, and anything the broker may
+ * still have acted on (a 5xx, a timeout, no response) is named ambiguous, which is what makes
+ * mutation callers quarantine rather than retry.
+ */
+function restated(error: Error | undefined, path: string): Error {
+  const endpoint = safeEndpoint(path)
+  const named = (message: string, name: string) => Object.assign(new Error(message), { name })
+  // Nothing in the shared client throws a non-Error; were one to appear, the safe reading for a
+  // mutation is that the broker may have acted.
+  if (!error) return named(`TastytradeApi:unexpected-failure:${endpoint}`, 'TastytradeApiAmbiguousError')
+  if (error instanceof TastytradeApiError) {
+    return named(`TastytradeApi:${error.status}:${endpoint}`, error.ambiguous ? 'TastytradeApiAmbiguousError' : 'TastytradeApiError')
+  }
+  if (error instanceof TastytradeOutcomeUnknownError || error instanceof TastytradeTransportError) {
+    return named(`TastytradeApi:no-response:${endpoint}`, 'TastytradeApiAmbiguousError')
+  }
+  if (error instanceof TastytradeAuthError) {
+    if (error.reason === 'missing-token') return new CallerVisibleError('TastytradeAuth:missing-token')
+    if (error.reason === 'invalid-lifetime') return new CallerVisibleError('TastytradeAuth:invalid-token-lifetime')
+    return new Error(`TastytradeAuth:${error.status ?? 'no-response'}`)
+  }
+  return error
 }
+
+export type TastyRequestInit = Pick<RequestOptions, 'body' | 'method' | 'signal'>
 
 export async function tastyRequest(
   env: AppEnv,
   path: string,
-  init: RequestInit = {},
+  init: TastyRequestInit = {},
   credential?: BrokerCredential,
 ): Promise<JsonValue> {
-  const accountPath = isAccountPath(path)
   // Account credentials are checked before any platform or network I/O. Market requests
-  // retain the existing coordinator-first failure order before stored secrets are read.
-  let token = accountPath ? await tokenForPath(env, path, credential) : undefined
+  // retain the coordinator-first failure order before stored secrets are read.
+  if (isAccountPath(path)) accountToken(credential)
   const gate = requestGate(env, accountNumberFromPath(path))
-  token ??= await tokenForPath(env, path, credential)
-  let response = await authorizedRequest(env, path, init, token, gate)
-  const method = (init.method ?? 'GET').toUpperCase()
-  if (!accountPath && response.status === 401 && (method === 'GET' || method === 'HEAD')) {
-    if (cachedAccess?.token === token) cachedAccess = undefined
-    await response.body?.cancel()
-    token = await tokenForPath(env, path, credential)
-    response = await authorizedRequest(env, path, init, token, gate)
+  try {
+    return await laneClient(env, path, credential, gate).request(path, { ...init, raw: true })
+  } catch (cause) {
+    throw restated(toError(cause), path)
   }
-  if (!response.ok) {
-    await response.body?.cancel()
-    const error = new Error(`TastytradeApi:${response.status}:${safeEndpoint(path)}`)
-    error.name = response.status >= 500 || response.status === 408
-      ? 'TastytradeApiAmbiguousError'
-      : 'TastytradeApiError'
-    throw error
-  }
-  if (response.status === 204) return {}
-  // The label carries the redacted endpoint so an oversized or malformed body names the
-  // same request the status error above would have named.
-  return readBoundedJson(response, MAX_TASTYTRADE_RESPONSE_BYTES, `TastytradeApi:${safeEndpoint(path)}`)
 }
 
 async function resolveAccountNumber(

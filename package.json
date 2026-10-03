@@ -14,7 +14,7 @@
     "preview": "vite preview",
     "deploy": "npm run build && cf d1 migrations apply e45e35cc-bd01-4e29-8940-b5d2ef5e840c --dir migrations && cf deploy --prebuilt",
     "deploy:preview": "npm run build && cf workers versions create --prebuilt",
-    "cf-typegen": "wrangler types",
+    "cf-typegen": "cf workers types",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",

@@ -2,6 +2,20 @@ function unsupported(): never {
   throw new Error('UnsupportedBrowserRunCall')
 }
 
+// Every Browser Run call these fakes do not answer throws, so a new call path fails loudly.
+const UNSUPPORTED_CALLS = {
+  acquire: unsupported,
+  closeSession: unsupported,
+  connectSession: unsupported,
+  fetch: unsupported,
+  getLiveView: unsupported,
+  getSession: unsupported,
+  history: unsupported,
+  launch: unsupported,
+  limits: unsupported,
+  listSessions: unsupported,
+}
+
 /**
  * A Browser Run binding whose only working call is the markdown quick action `record_catalysts`
  * and `record_evidence` make to re-read a cited page (src/server/research-page-retention.ts).
@@ -10,7 +24,11 @@ function unsupported(): never {
  */
 export function markdownBrowser(markdown: string): BrowserRun {
   return {
-    fetch: unsupported,
+    ...UNSUPPORTED_CALLS,
+    // A getter, so it cannot ride in the spread above without being called.
+    get devtools(): never {
+      return unsupported()
+    },
     quickAction: async () => Response.json({ result: markdown, success: true }),
   }
 }
@@ -18,7 +36,11 @@ export function markdownBrowser(markdown: string): BrowserRun {
 /** The same binding for the path where a cited page will not open at all. */
 export function unreadableBrowser(): BrowserRun {
   return {
-    fetch: unsupported,
+    ...UNSUPPORTED_CALLS,
+    // A getter, so it cannot ride in the spread above without being called.
+    get devtools(): never {
+      return unsupported()
+    },
     quickAction: async () => new Response('', { status: 502 }),
   }
 }
@@ -32,7 +54,11 @@ export function pagesBrowser(pages: Readonly<Record<string, string>>): BrowserRu
   // SAFETY: `quickAction` is BrowserRun's overloaded method; this one implementation answers the
   // markdown overload the retention module calls, and every other method throws.
   return {
-    fetch: unsupported,
+    ...UNSUPPORTED_CALLS,
+    // A getter, so it cannot ride in the spread above without being called.
+    get devtools(): never {
+      return unsupported()
+    },
     quickAction: async (_action: string, options: { url?: string }) => {
       const url = options.url ?? ''
       reads.push(url)

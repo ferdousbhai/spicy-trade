@@ -2,12 +2,12 @@ import { z } from 'zod'
 
 import { type AppEnv } from './env'
 import { readBoundedJson } from './bounded-response'
-import {
-  apiBase,
-  MAX_TASTYTRADE_AUTH_RESPONSE_BYTES,
-  TASTYTRADE_REQUEST_TIMEOUT_MS,
-  USER_AGENT,
-} from './tastytrade'
+import { apiBase, TASTYTRADE_REQUEST_TIMEOUT_MS, USER_AGENT } from './tastytrade'
+
+// A named budget for the buffered parse of one OAuth token response. The real response is a handful
+// of short fields, a few KB with a JWT access token; about a hundredfold headroom means a longer
+// token never trips it, while a runaway or hostile body is still refused before it is buffered.
+const MAX_TASTYTRADE_AUTH_RESPONSE_BYTES = 256_000
 
 /*
  * Token requests on a member's behalf, under spicytrade's tastytrade OAuth app.

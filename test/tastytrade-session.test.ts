@@ -141,4 +141,22 @@ describe('tastytrade OAuth boundary', () => {
     })).rejects.toThrow('/accounts/[redacted]/orders')
     expect(brokerGate.namespace.getByName).toHaveBeenCalledWith('tastytrade:SECRET123')
   })
+
+  it.each([
+    ['a 503 keeps its status', () => new Response('', { status: 503 }), 'TastytradeApi:503:/accounts/[redacted]/orders'],
+    ['an unreadable 2xx body', () => new Response('{"data":', { status: 201 }), 'TastytradeApi:unreadable-response:/accounts/[redacted]/orders'],
+  ])('names an order submission the broker may have accepted ambiguous: %s', async (_, answer, message) => {
+    vi.resetModules()
+    vi.stubGlobal('fetch', vi.fn(async () => answer()))
+    const { tastyRequest } = await import('../src/server/tastytrade')
+    const brokerGate = stubBrokerGate()
+
+    const failure = await tastyRequest({ BROKER_GATE: brokerGate.namespace }, '/accounts/SECRET123/orders', {
+      method: 'POST',
+      body: {},
+    }, { accessToken: 'member-access-token', broker: 'tastytrade' }).catch((cause: unknown) => cause)
+
+    // Anything but TastytradeApiError sends placement into quarantine instead of a refusal.
+    expect(failure).toMatchObject({ message, name: 'TastytradeApiAmbiguousError' })
+  })
 })

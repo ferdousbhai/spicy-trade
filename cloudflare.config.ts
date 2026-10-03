@@ -38,7 +38,9 @@ export default defineConfig({
     triggers: [
       // 13:30 UTC is 09:30 EDT; 14:30 UTC is 09:30 EST. The year-candle job runs only at the
       // Eastern cash open, so the off-season fire is a no-op. The lease and unresolved-instrument sweeps still run both times.
-      triggers.scheduled({ schedule: '30 13,14 * * 1-5' }),
+      // Day names, not numbers: Cloudflare cron counts 1 as Sunday, so '1-5' ran Sunday through
+      // Thursday and skipped Fridays.
+      triggers.scheduled({ schedule: '30 13,14 * * MON-FRI' }),
     ],
     env: {
       BROKER_GATE: bindings.durableObject({ worker: 'spicytrade', exportName: 'BrokerGate' }),

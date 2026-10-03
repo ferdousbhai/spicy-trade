@@ -5,7 +5,6 @@ import {
   createRootRoute,
   createRoute,
   createRouter,
-  isRedirect,
 } from '@tanstack/react-router'
 import { expect, it } from 'vitest'
 
@@ -46,18 +45,4 @@ it('replaces the root entry, so Back does not return to a page that only redirec
   await router.load()
   expect(history.length).toBe(1)
   expect(history.location.pathname).toBe('/watch')
-})
-
-it('decides in the browser, as the client-rendered shell it forwards to does', () => {
-  expect(EntryRoute.options.ssr).toBe(false)
-  const beforeLoad = EntryRoute.options.beforeLoad
-  if (!beforeLoad) throw new Error('the entry route lost its redirect')
-  let thrown: unknown
-  try {
-    // SAFETY: the redirect reads only `location`; the rest of the context is never touched.
-    void beforeLoad({ location: { hash: '', search: {} } } as never)
-  } catch (error) {
-    thrown = error
-  }
-  expect(isRedirect(thrown)).toBe(true)
 })

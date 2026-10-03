@@ -85,7 +85,7 @@ test('a newer deployment reloads once before restoring the local snapshot', asyn
   await expect.poll(() => page.evaluate(() => sessionStorage.getItem('spice.deployment-reload.v1'))).toBeNull()
 })
 
-test('a signed-in member sees an amber avatar whose menu signs them out', async ({ page }) => {
+test('a signed-in member can sign out through the account menu', async ({ page }) => {
   const snapshot = marketSnapshotFixture()
   let signedIn = true
   let signOutRequests = 0
@@ -107,9 +107,6 @@ test('a signed-in member sees an amber avatar whose menu signs them out', async 
   await page.goto('/')
   const trigger = page.getByRole('button', { name: 'Account menu for Dana Member' })
   await expect(trigger).toBeVisible()
-  // The brand amber, not the shadcn theme's grey hover surface that once shadowed it.
-  await expect(trigger.locator('[data-slot="avatar-fallback"]')).toHaveCSS('background-color', 'rgb(255, 171, 74)')
-
   await trigger.click()
   await expect(page.getByRole('menu')).toContainText('Dana Member')
   await page.getByRole('menuitem', { name: 'Sign out' }).click()

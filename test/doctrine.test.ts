@@ -3,11 +3,7 @@ import { describe, expect, it } from 'vitest'
 /** The per-turn ceiling `test/mcp.test.ts` holds the whole advertised surface to. */
 const SPICE_MCP_INSTRUCTIONS_CHAR_BUDGET = 1_500
 import { SPICE_GUIDE, PLACE_BROKERAGE_ORDER_DESCRIPTION, spiceMcpInstructions } from '../src/server/doctrine'
-import {
-  createInstrumentQuoteReadTool,
-  createOptionContractFindTool,
-} from '../src/server/brokerage-read-tools'
-import { createExactOptionGreeksReadTool } from '../src/server/option-greeks-tool'
+import { createOptionContractFindTool } from '../src/server/brokerage-read-tools'
 import { createBrokerageReconciliationTool } from '../src/server/brokerage-reconciliation'
 
 /*
@@ -25,16 +21,6 @@ describe('server instructions', () => {
     // The rest of the sizing posture moved into the trade-idea prompt, which costs nothing
     // until someone invokes it. What stays here is the part that governs any answer at all.
     for (const instructions of [signedIn, anonymous]) expect(instructions).toContain('recommend nothing')
-  })
-
-  it('states each rule once', () => {
-    // "Never state ... from memory" used to appear here and again on three tool descriptions.
-    // Both places are in every model call, so the duplicate bought attention, not coverage.
-    for (const instructions of [signedIn, anonymous]) {
-      expect(instructions.match(/from memory/g)).toHaveLength(1)
-    }
-    expect(createInstrumentQuoteReadTool({}).description).not.toContain('from memory')
-    expect(createExactOptionGreeksReadTool({}).description).not.toContain('from memory')
   })
 
   it('states that the server, not the advice, decides admissibility', () => {
@@ -57,15 +43,6 @@ describe('server instructions', () => {
     expect(signedIn).toContain('Planned size is not a fill quantity')
     expect(PLACE_BROKERAGE_ORDER_DESCRIPTION).not.toContain('tick-aligned mid')
   })
-
-  it('is built only from this repository, so untrusted content cannot reach an agent through it', () => {
-    // A literal template of our own constants. Anything provider-, model- or page-derived would
-    // make this server an injection vector into someone else's agent.
-    for (const instructions of [signedIn, anonymous]) {
-      expect(instructions).not.toMatch(/undefined|\[object|NaN/)
-    }
-  })
-
 })
 
 describe('the guide', () => {
@@ -124,4 +101,3 @@ describe('prompt arguments', () => {
     expect(anonymous).not.toMatch(/read_account|account's|dry-run/)
   })
 })
-

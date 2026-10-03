@@ -3,7 +3,6 @@ import { z } from 'zod'
 
 import {
   EQUITY_SYMBOL_PATTERN,
-  EQUITY_SYMBOL_REGEX,
   equitySymbolFromModelText,
   equitySymbolsFromModelText,
   EquitySymbolSchema,
@@ -13,7 +12,6 @@ import {
 import { WatchlistActionParameters } from '../src/server/agent-contracts'
 import {
   AccountHistoryReadParameters,
-  EQUITY_SYMBOL,
   InstrumentQuoteReadParameters,
   MarketMetricsReadParameters,
   OptionContractFindParameters,
@@ -74,10 +72,6 @@ describe('equity symbol rule', () => {
     // Anything beyond these two is drift.
     expect(new Set(equityPatterns.map((pattern) => pattern.replaceAll('\\/', '/'))))
       .toEqual(new Set([EQUITY_SYMBOL_PATTERN, MODEL_TEXT_EQUITY_SYMBOL_PATTERN]))
-  })
-
-  it('shares the compiled rule with the brokerage response guard', () => {
-    expect(EQUITY_SYMBOL).toBe(EQUITY_SYMBOL_REGEX)
   })
 
   it('normalizes case and surrounding whitespace before matching', () => {

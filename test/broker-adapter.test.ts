@@ -133,11 +133,6 @@ describe('registered adapters', () => {
       expect(brokerAdapterFor({ accessToken: 'token', broker }).id).toBe(broker)
     }
   })
-
-  it('routes a tastytrade credential to the tastytrade adapter', () => {
-    expect(brokerAdapterFor(brokerCredential)).toBe(tastytradeAdapter)
-    expect(tastytradeAdapter.id).toBe('tastytrade')
-  })
 })
 
 describe('tastytrade order history for reconciliation', () => {

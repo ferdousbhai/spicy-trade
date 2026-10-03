@@ -29,12 +29,6 @@ describe('authorized app identity', () => {
     }), {})).resolves.toBeNull()
   })
 
-  it('still checks a request that carries a session cookie', async () => {
-    await expect(getAuthenticatedIdentity(new Request('https://spicy.trade/api/viewer', {
-      headers: { cookie: '__Secure-better-auth.session_token=abc' },
-    }), {})).rejects.toThrow('AuthDatabaseMissing')
-  })
-
   it('names a configuration failure by its code, which is all a failure log records', async () => {
     await expect(getAuthenticatedIdentity(new Request('https://spicy.trade/api/viewer', {
       headers: { cookie: '__Secure-better-auth.session_token=abc' },

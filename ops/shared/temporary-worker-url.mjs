@@ -3,7 +3,7 @@ import { pathToFileURL } from 'node:url'
 
 export function extractTemporaryWorkerUrl(output, workerName) {
   const workerLabel = workerName.toLowerCase()
-  const candidates = output.match(/https:\/\/[^\s]+/g) ?? []
+  const candidates = output.match(/https:\/\/[^\s"'<>,]+/g) ?? []
   for (const candidate of candidates.toReversed()) {
     try {
       const url = new URL(candidate)
@@ -13,10 +13,10 @@ export function extractTemporaryWorkerUrl(output, workerName) {
         return url.origin
       }
     } catch {
-      // Wrangler output contains other prose and may contain non-URL punctuation.
+      // The log holds deploy prose and JSON; a candidate may carry trailing punctuation.
     }
   }
-  throw new Error(`Wrangler did not report the workers.dev URL for ${workerName}.`)
+  throw new Error(`Cloudflare did not report the workers.dev URL for ${workerName}.`)
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

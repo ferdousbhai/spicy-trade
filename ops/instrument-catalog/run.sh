@@ -12,7 +12,7 @@ if [[ "$ops_mode" != 'preview' && "$ops_mode" != 'apply' ]]; then
 fi
 
 trap temporary_worker_cleanup_on_exit EXIT
-temporary_worker_start "$ops_worker" ops/instrument-catalog/wrangler.jsonc
+temporary_worker_start "$ops_worker" ops/instrument-catalog
 
 catalog_field() {
   node -e '

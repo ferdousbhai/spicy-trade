@@ -18,6 +18,7 @@ temporary_worker_deployed='false'
 temporary_worker_name_value=''
 temporary_worker_log=''
 temporary_worker_secret=''
+temporary_worker_secrets_file=''
 temporary_worker_url=''
 
 temporary_worker_name() {
@@ -40,14 +41,16 @@ temporary_worker_name() {
 temporary_worker_release_local_files() {
   [[ -z "$temporary_worker_log" ]] || rm -f "$temporary_worker_log"
   [[ -z "$temporary_worker_secret" ]] || rm -f "$temporary_worker_secret"
+  [[ -z "$temporary_worker_secrets_file" ]] || rm -f "$temporary_worker_secrets_file"
   temporary_worker_log=''
   temporary_worker_secret=''
+  temporary_worker_secrets_file=''
   temporary_worker_url=''
 }
 
-# Runs one Wrangler step into the shared log, retrying the transport. `mode` is
-# truncate for the deploy, whose output the URL reader parses, and append for later
-# steps that must not erase it. Any redirection a step needs belongs inside the step's
+# Runs one `cf` step into the shared log, retrying the transport. `mode` is truncate
+# for the deploy and append for later steps that must not erase it; the URL reader
+# parses the log once the Worker's details are in it. Any redirection a step needs belongs inside the step's
 # own function so each attempt re-opens it: a redirect applied here would leave the
 # second attempt reading an exhausted descriptor.
 temporary_worker_api_retry() {
@@ -95,17 +98,21 @@ temporary_worker_wait_until_routable() {
   done
 }
 
+# `cf deploy` reads `cloudflare.config.ts` from the directory it runs in, so each ops
+# Worker keeps its config in its own folder and takes this run's name from the
+# environment. The token travels with the version (`--secrets-file`), so the Worker is
+# never live without it.
 temporary_worker_deploy_step() {
-  npx wrangler deploy --config "$1" --name "$2"
+  (cd "$1" && SPICE_OPS_WORKER_NAME="$2" npx cf deploy --secrets-file "$temporary_worker_secrets_file")
 }
 
-temporary_worker_token_step() {
-  npx wrangler secret put OPS_AUTH_TOKEN --name "$1" <"$temporary_worker_secret"
+temporary_worker_details_step() {
+  npx cf workers get "$1"
 }
 
 temporary_worker_start() {
   local worker_name="$1"
-  local config_path="$2"
+  local config_dir="$2"
   if [[ "$temporary_worker_deployed" == 'true' ]]; then
     echo "Temporary Worker is already deployed: $temporary_worker_name_value" >&2
     return 1
@@ -116,15 +123,18 @@ temporary_worker_start() {
   temporary_worker_secret="$(mktemp)"
   chmod 600 "$temporary_worker_secret"
   openssl rand -hex 32 >"$temporary_worker_secret"
+  temporary_worker_secrets_file="$(mktemp)"
+  chmod 600 "$temporary_worker_secrets_file"
+  printf 'OPS_AUTH_TOKEN=%s\n' "$(cat "$temporary_worker_secret")" >"$temporary_worker_secrets_file"
 
   if ! temporary_worker_api_retry truncate 'Temporary Worker deploy' \
-    temporary_worker_deploy_step "$config_path" "$worker_name"; then
+    temporary_worker_deploy_step "$config_dir" "$worker_name"; then
     return 1
   fi
   temporary_worker_deployed='true'
 
-  if ! temporary_worker_api_retry append 'Temporary Worker token install' \
-    temporary_worker_token_step "$worker_name"; then
+  if ! temporary_worker_api_retry append 'Temporary Worker lookup' \
+    temporary_worker_details_step "$worker_name"; then
     return 1
   fi
 
@@ -150,7 +160,7 @@ temporary_worker_stop() {
   local delete_output=''
   local delete_status=0
   if [[ "$temporary_worker_deployed" == 'true' ]]; then
-    if ! delete_output="$(npx wrangler delete "$temporary_worker_name_value" --force 2>&1)"; then
+    if ! delete_output="$(npx cf workers delete "$temporary_worker_name_value" --force 2>&1)"; then
       echo "Failed to delete temporary Worker: $temporary_worker_name_value" >&2
       printf '%s\n' "$delete_output" >&2
       delete_status=1

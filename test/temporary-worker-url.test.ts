@@ -14,10 +14,21 @@ describe('temporary Worker URL extraction', () => {
     )
   })
 
+  it('reads the route from the Worker details `cf workers get` prints', () => {
+    const output = JSON.stringify({
+      name: 'spice-catalog-new',
+      subdomain: {
+        url: 'https://spice-catalog-new.owner.workers.dev',
+        preview_url_suffix: '-spice-catalog-new.owner.workers.dev',
+      },
+    }, null, 2)
+    expect(extractTemporaryWorkerUrl(output, 'spice-catalog-new')).toBe('https://spice-catalog-new.owner.workers.dev')
+  })
+
   it('rejects a route belonging to another deployment', () => {
     expect(() => extractTemporaryWorkerUrl(
       'https://spice-catalog-old.owner.workers.dev',
       'spice-catalog-new',
-    )).toThrow('Wrangler did not report the workers.dev URL for spice-catalog-new.')
+    )).toThrow('Cloudflare did not report the workers.dev URL for spice-catalog-new.')
   })
 })

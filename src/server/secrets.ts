@@ -1,4 +1,4 @@
-// Worker-bound secrets (`wrangler secret put`) arrive as plain strings; Secrets Store
+// Worker-bound secrets (`cf workers secrets update`) arrive as plain strings; Secrets Store
 // bindings (`secretsStoreSecret` in cloudflare.config.ts) arrive as objects exposing
 // `.get()`. Which binding is which is fixed by configuration and recorded in `AppEnv`,
 // so each kind gets its own reader rather than a runtime shape probe.

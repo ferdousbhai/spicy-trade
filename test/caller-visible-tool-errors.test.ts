@@ -135,10 +135,6 @@ const cases: [string, string, () => Promise<void> | void][] = [
     const { strictTastytradeRows } = await import('../src/server/tastytrade-market-normalization')
     strictTastytradeRows({}, 'TastytradeMarketMetrics')
   }],
-  ['tastytrade-tick-sizes', 'OrderMarket:invalid-tick-value', async () => {
-    const { tastytradeTickSizes } = await import('../src/server/tastytrade-tick-sizes')
-    tastytradeTickSizes([{ value: -1 }], 'OrderMarket')
-  }],
   ['order-payload', 'OrderPayload:missing-resolved-symbol', async () => {
     const { buildOrderPayload } = await import('../src/server/order-payload')
     buildOrderPayload(equityOrder, [''])

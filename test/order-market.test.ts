@@ -43,15 +43,16 @@ describe('order market boundary', () => {
     })
   })
 
-  it('uses finite Equity thresholds as inclusive floors', () => {
+  it('reads Equity thresholds as exclusive upper bounds, as tastytrade sends them', () => {
     const equity = {
       kind: 'place_equity_order' as const,
       symbol: 'SPY', action: 'Buy to Open' as const, quantity: 1,
       limitPrice: 10, priceEffect: 'Debit' as const,
     }
+    // SPY's live `tick-sizes`: sub-penny below $1, a cent from $1 up.
     const equityInstrument = { data: {
       symbol: 'SPY',
-      'tick-sizes': { symbol: 'SPY', threshold: '1', value: '0.01' },
+      'tick-sizes': [{ symbol: 'SPY', threshold: '1.0', value: '0.0001' }, { symbol: 'SPY', value: '0.01' }],
     } }
     const equityQuote = (bid: string, ask: string) => ({ data: { items: [{
       symbol: 'SPY', 'instrument-type': 'Equity', bid, ask,
@@ -64,17 +65,18 @@ describe('order market boundary', () => {
     expect(orderMarketFromPayloads(
       { ...equity, limitPrice: 1 }, equityQuote('0.99', '1.01'), equityInstrument, undefined, now,
     ).tickSize).toBe(0.01)
-    expect(() => orderMarketFromPayloads(
-      { ...equity, limitPrice: 0.99 }, equityQuote('0.98', '1.00'), equityInstrument, undefined, now,
-    )).toThrow('ambiguous-tick-rules')
-
-    const equityWithBase = { data: {
-      symbol: 'SPY',
-      'tick-sizes': [{ value: '0.0001' }, { threshold: '1', value: '0.01' }],
-    } }
     expect(orderMarketFromPayloads(
-      { ...equity, limitPrice: 0.99 }, equityQuote('0.98', '1.00'), equityWithBase, undefined, now,
+      { ...equity, limitPrice: 0.99 }, equityQuote('0.98', '1.00'), equityInstrument, undefined, now,
     ).tickSize).toBe(0.0001)
+    // Read as lower floors, these tiers put a $10 stock on a 0.0001 grid, which tastytrade rejects.
+    expect(refusal(() => orderMarketFromPayloads(
+      { ...equity, limitPrice: 10.005 }, equityQuote('9.99', '10.01'), equityInstrument, undefined, now,
+    ))).toMatchObject({ check: 'limit-off-tick', untrustedBrokerData: { tickSize: 0.01 } })
+
+    const withoutTopTier = { data: { symbol: 'SPY', 'tick-sizes': { symbol: 'SPY', threshold: '1', value: '0.01' } } }
+    expect(() => orderMarketFromPayloads(
+      equity, equityQuote('9.99', '10.01'), withoutTopTier, undefined, now,
+    )).toThrow('ambiguous-tick-rules')
   })
 
   it('checks a limit against a quote at most QUOTE_MAX_AGE_MS old', () => {

@@ -12,7 +12,7 @@ import {
 /*
  * Token requests on a member's behalf, under spicytrade's tastytrade OAuth app.
  *
- * Deliberately apart from `refreshAccessToken` / `cachedAccess` in `tastytrade.ts`. Those spend
+ * Deliberately apart from the market lane in `tastytrade.ts` (`laneClient`, `marketTokens`), which spends
  * the Worker's own market-data grant (`TASTYTRADE_CLIENT_SECRET` / `TASTYTRADE_REFRESH_TOKEN`),
  * which is reachable from exactly one line behind a non-account-path check. This module never
  * reads either binding and keeps no state: the member's refresh token arrives in the request,

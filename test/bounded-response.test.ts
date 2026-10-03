@@ -34,12 +34,12 @@ describe('bounded upstream response reader', () => {
     const secretish = `{"session-token":"${'s'.repeat(400)}"`
     let message = ''
     try {
-      await readBoundedJson(new Response(secretish), 100_000, 'TastytradeAuth')
+      await readBoundedJson(new Response(secretish), 100_000, 'TastytradeMemberGrant')
     } catch (cause) {
       message = toError(cause)?.message ?? ''
     }
 
-    expect(message).toContain('TastytradeAuth:invalid-json:')
+    expect(message).toContain('TastytradeMemberGrant:invalid-json:')
     expect(message).not.toContain('session-token')
     // The digest recorded by scheduled-jobs truncates at 160 characters; the label and
     // the structural hint must both survive it.

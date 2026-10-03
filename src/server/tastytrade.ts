@@ -93,10 +93,6 @@ export const BROKER_SYMBOL_CHUNK_SIZE = 100
  * (`REFRESH_LEASE_MS`, 30 s), which assumes a slow provider answers within its lease.
  */
 export const TASTYTRADE_REQUEST_TIMEOUT_MS = 20_000
-// A named budget for the buffered parse of one OAuth token response. The real response is a handful
-// of short fields, a few KB with a JWT access token; about a hundredfold headroom means a longer
-// token never trips it, while a runaway or hostile body is still refused before it is buffered.
-export const MAX_TASTYTRADE_AUTH_RESPONSE_BYTES = 256_000
 // This store holds only the Worker's market-data token, as a settled value: the shared client
 // keeps a pending refresh to itself. A per-request account token is never stored, because this
 // module state is shared by every isolate user.
@@ -186,14 +182,14 @@ function accountNumberFromPath(path: string): string | undefined {
  * else: the shared client neither refreshes nor retries a caller-minted token. Every other path
  * spends the Worker's own grant, whose secrets are read only when a token has to be minted.
  */
-function laneClient(env: AppEnv, path: string, credential: BrokerCredential | undefined, gate: BrokerRequestGate) {
+function laneClient(env: AppEnv, memberToken: string | undefined, gate: BrokerRequestGate) {
   const common = {
     apiBase: apiBase(env),
     gate: { acquire: () => gate.acquire() },
     timeoutMs: TASTYTRADE_REQUEST_TIMEOUT_MS,
     userAgent: USER_AGENT,
   }
-  if (isAccountPath(path)) return createTastytradeClient({ ...common, accessToken: accountToken(credential) })
+  if (memberToken !== undefined) return createTastytradeClient({ ...common, accessToken: memberToken })
   return createTastytradeClient({
     ...common,
     clientSecret: () => readStoredSecret(env.TASTYTRADE_CLIENT_SECRET, 'TASTYTRADE_CLIENT_SECRET'),
@@ -216,21 +212,23 @@ function accountToken(credential: BrokerCredential | undefined): string {
 function restated(error: Error | undefined, path: string): Error {
   const endpoint = safeEndpoint(path)
   const named = (message: string, name: string) => Object.assign(new Error(message), { name })
-  // Nothing in the shared client throws a non-Error; were one to appear, the safe reading for a
-  // mutation is that the broker may have acted.
-  if (!error) return named(`TastytradeApi:unexpected-failure:${endpoint}`, 'TastytradeApiAmbiguousError')
-  if (error instanceof TastytradeApiError) {
-    return named(`TastytradeApi:${error.status}:${endpoint}`, error.ambiguous ? 'TastytradeApiAmbiguousError' : 'TastytradeApiError')
-  }
-  if (error instanceof TastytradeOutcomeUnknownError || error instanceof TastytradeTransportError) {
-    return named(`TastytradeApi:no-response:${endpoint}`, 'TastytradeApiAmbiguousError')
+  // An unanswered mutation arrives wrapped; its status, when the broker sent one, is kept.
+  const apiError = error instanceof TastytradeOutcomeUnknownError ? error.cause : error
+  if (apiError instanceof TastytradeApiError) {
+    const ambiguous = apiError.ambiguous || error instanceof TastytradeOutcomeUnknownError
+    return named(`TastytradeApi:${apiError.status}:${endpoint}`, ambiguous ? 'TastytradeApiAmbiguousError' : 'TastytradeApiError')
   }
   if (error instanceof TastytradeAuthError) {
     if (error.reason === 'missing-token') return new CallerVisibleError('TastytradeAuth:missing-token')
     if (error.reason === 'invalid-lifetime') return new CallerVisibleError('TastytradeAuth:invalid-token-lifetime')
     return new Error(`TastytradeAuth:${error.status ?? 'no-response'}`)
   }
-  return error
+  // No response, a body that could not be read, or anything else: the broker may have acted, so
+  // a mutation caller must quarantine rather than read this as a refusal.
+  const reason = error instanceof TastytradeOutcomeUnknownError || error instanceof TastytradeTransportError
+    ? 'no-response'
+    : 'unreadable-response'
+  return named(`TastytradeApi:${reason}:${endpoint}`, 'TastytradeApiAmbiguousError')
 }
 
 export type TastyRequestInit = Pick<RequestOptions, 'body' | 'method' | 'signal'>
@@ -243,10 +241,10 @@ export async function tastyRequest(
 ): Promise<JsonValue> {
   // Account credentials are checked before any platform or network I/O. Market requests
   // retain the coordinator-first failure order before stored secrets are read.
-  if (isAccountPath(path)) accountToken(credential)
+  const memberToken = isAccountPath(path) ? accountToken(credential) : undefined
   const gate = requestGate(env, accountNumberFromPath(path))
   try {
-    return await laneClient(env, path, credential, gate).request(path, { ...init, raw: true })
+    return await laneClient(env, memberToken, gate).request(path, { ...init, raw: true })
   } catch (cause) {
     throw restated(toError(cause), path)
   }
@@ -270,8 +268,7 @@ async function resolveAccountNumber(
 }
 
 async function loadQuoteToken(env: AppEnv): Promise<{ token: string; url: string }> {
-  const payload = jsonObjectOrEmpty(await tastyRequest(env, '/api-quote-tokens'))
-  const data = jsonObjectOrEmpty(payload.data ?? payload)
+  const data = jsonObjectOrEmpty(jsonObjectOrEmpty(await tastyRequest(env, '/api-quote-tokens')).data)
   const token = jsonText(data.token)
   const url = jsonText(data['dxlink-url'])
   if (!token || !url || !url.startsWith('wss://')) throw new CallerVisibleError('TastytradeQuoteToken:invalid')

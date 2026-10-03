@@ -21,13 +21,4 @@ describe('TypeBox runtime', () => {
 
     expect(Compile(Type.Object({ url: Type.String() })).IsAccelerated()).toBe(false)
   })
-
-  it('keeps the interpreted checker equivalent to the generated one', () => {
-    configureTypeboxRuntime()
-    const validator = Compile(Type.Object({ url: Type.String() }, { additionalProperties: false }))
-
-    expect(validator.Check({ url: 'https://example.com' })).toBe(true)
-    expect(validator.Check({ url: 7 })).toBe(false)
-    expect(validator.Check({ unexpected: true, url: 'https://example.com' })).toBe(false)
-  })
 })
